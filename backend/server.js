@@ -35,6 +35,10 @@ if (!fs.existsSync(uploadDir)) {
 }
 app.use('/uploads', express.static(uploadDir));
 
+// Serve the frontend from this same Render web service.
+const frontendDir = path.join(__dirname, '..', 'frontend');
+app.use(express.static(frontendDir));
+
 // Initialize Razorpay
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
@@ -603,9 +607,9 @@ app.post('/api/owner/availability-checks/:vehicleId', authMiddleware, async (req
     }
 });
 
-// Health check endpoint
-app.get('/', (req, res) => {
-    res.send('🚀 Rent Connect India API Server is up and running.');
+// Health check endpoint for Render
+app.get('/health', (req, res) => {
+    res.status(200).json({ success: true, message: 'Rent Connect India is running.' });
 });
 
 // Start Server
