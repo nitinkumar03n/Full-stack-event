@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="320" viewBox="0 0 1000 320" role="img" aria-labelledby="title desc">
+  <title id="title">Rent Connect India</title>
+  <desc id="desc">Minimal vehicle-rental logo with a small upward arrow.</desc>
+  <rect width="1000" height="320" rx="34" fill="#FFFFFF"/>
+  <!-- compact growth / movement arrow -->
+  <g transform="translate(88 103)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 93 43 55l29 29L143 13" stroke="#F37021" stroke-width="17"/>
+    <path d="M102 13h41v41" stroke="#F37021" stroke-width="17"/>
+  </g>
+  <g transform="translate(285 88)">
+    <text x="0" y="83" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="700" letter-spacing="-3" fill="#123E5A">Rent</text>
+    <text x="198" y="83" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="700" letter-spacing="-3" fill="#F37021">Connect</text>
+    <text x="2" y="137" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" letter-spacing="11" fill="#176795">INDIA</text>
+    <text x="2" y="192" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="400" letter-spacing="1" fill="#70818A">Cars  •  Bikes  •  Cycles</text>
+  </g>
+</svg>

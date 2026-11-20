@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="105" viewBox="0 0 500 105" role="img" aria-labelledby="title">
+  <title id="title">India location selector</title>
+  <rect x="8" y="8" width="484" height="89" rx="45" fill="#FFFFFF" stroke="#D3D7DC" stroke-width="2"/>
+  <path d="M67 39c-8.2 0-14.8 6.6-14.8 14.8C52.2 64.9 67 78 67 78s14.8-13.1 14.8-24.2C81.8 45.6 75.2 39 67 39Z" fill="none" stroke="#F37021" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="67" cy="53.8" r="4.7" fill="none" stroke="#F37021" stroke-width="3.5"/>
+  <text x="105" y="65" font-family="Arial, Helvetica, sans-serif" font-size="33" font-weight="500" fill="#101217">India</text>
+  <path d="m460 42 13 12-13 12" fill="none" stroke="#B7BBC1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

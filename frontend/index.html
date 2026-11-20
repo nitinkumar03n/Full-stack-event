@@ -1,0 +1,334 @@
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rent Connect India</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav>
+        <div class="nav-left">
+            <a href="/">
+                <img src="./assets/logo.svg" alt="Rent Connect India logo" width="100">
+            </a>
+
+            <div class="nav-country">
+                <img src="./assets/Codex Image 26 Aug 2026, 00_10_10.svg" height="35" alt="">
+            </div>
+            <!-- User's Own Location Selector -->
+<div class="location-selector">
+    <!-- Corrected User City Selector -->
+<select id="userCity">
+    <option value="">All Cities</option>
+    <option value="raipur">Raipur</option>
+    <option value="durg">Durg</option>
+    <option value="bhopal">Bhopal</option>
+    <option value="indore">Indore</option>
+    <option value="nagpur">Nagpur</option>
+    <option value="delhi">Delhi</option>
+    <option value="mumbai">Mumbai</option>
+    <option value="bhilai">Bhilai</option>
+</select>
+    <button type="button" id="detectLocationBtn" title="Detect my location">📍</button>
+</div>
+
+            <!-- Stretched Search Bar -->
+            <div class="nav-search">
+                <input type="text" id="searchInput" aria-label="Search">
+
+                <div class="search-hint" id="searchHint">
+                    <span>Search</span>
+                    <div class="word-window">
+                        <div class="word-list">
+                            <span>Cars</span>
+                            <span>Bikes</span>
+                            <span>Cycles</span>
+                            <span>Cars</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button">⌕</button>
+            </div>
+
+            <!-- Simple Wishlist Section -->
+            <div class="wishlist-container">
+                <button type="button" class="wishlist-btn" id="wishlistBtn">
+                    <svg class="heart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                    <span class="wishlist-text">Wishlist</span>
+                    <span class="wishlist-count" id="wishlistCount">(0)</span>
+                </button>
+            </div>
+<!-- Language & Country Selector -->
+<div class="lang-selector">
+    <img src="https://flagcdn.com/w20/in.png" alt="India Flag" class="flag-icon">
+    <span class="lang-text">EN</span>
+</div>
+<!-- User Account / Login Button -->
+<div class="user-account">
+    <button type="button" class="user-btn" id="userBtn" aria-label="User Account">
+        <svg class="user-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        <span class="user-text">Login</span>
+    </button>
+</div>
+    <!-- Rent/List Item Button -->
+<div class="rent-post-container">
+    <button type="button" class="rent-post-btn" id="rentPostBtn">
+        <span class="plus-icon">+</span>
+        <span>Rent your item</span>
+    </button>
+    <!-- Mini Thank You Tag -->
+<div class="nav-thankyou">
+    <span>Thank You!</span>
+</div>
+
+</div>
+        </div>
+    </nav>
+
+    <!-- Script tag ko humesha body tag khatam hone se theek pehle rakhein -->
+    
+
+<!-- Hero Banner Section -->
+<section class="hero-section">
+    <div class="hero-content">
+        <h1>Rent Cars, Bikes & Cycles Near You</h1>
+        <p>Affordable, reliable, and quick rentals across India.</p>
+        
+        <!-- Category Quick Filters -->
+        <div class="category-filters">
+            <button class="category-btn active">
+                <span>🚗</span> Cars
+            </button>
+            <button class="category-btn">
+                <span>🏍️</span> Bikes
+            </button>
+            <button class="category-btn">
+                <span>🚲</span> Cycles
+            </button>
+        </div>
+    </div>
+</section>
+<!-- Rental Items Section -->
+<section class="items-section">
+    <h2 class="section-title">Available Rentals</h2>
+    <div class="items-grid" id="itemsGrid">
+        
+        <p>Loading available vehicles...</p>
+    </div>
+</section><!-- Login & Registration Modal -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal-card">
+        <button class="close-btn" id="closeAuthModal">&times;</button>
+        
+        <!-- Tab Switches -->
+        <div class="auth-tabs">
+            <button class="tab-btn active" id="loginTabBtn">Login</button>
+            <button class="tab-btn" id="signupTabBtn">Register</button>
+        </div>
+
+        <!-- LOGIN FORM -->
+        <form id="loginForm" class="auth-form active">
+    <h2>Welcome Back</h2>
+    <div class="input-group">
+        <label for="loginEmail" id="loginIdLabel">Email / Phone</label>
+        <input type="text" id="loginEmail" required placeholder="Enter email or phone">
+    </div>
+    <div class="input-group" id="loginPasswordGroup">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" placeholder="Enter password">
+    </div>
+    <div class="input-group hidden" id="loginOtpGroup">
+        <label for="loginOtp">OTP</label>
+        <input type="text" id="loginOtp" maxlength="6" inputmode="numeric" placeholder="6-digit OTP">
+    </div>
+    <button type="button" id="sendLoginOtp" class="submit-btn hidden" style="margin-top:0">Send OTP</button>
+    <button type="submit" class="submit-btn">Login</button>
+    <button type="button" id="toggleLoginMode" class="link-btn">Login with OTP instead</button>
+</form>
+               <!-- REGISTRATION FORM -->
+        <form id="signupForm" class="auth-form">
+            <h2>Create Account</h2>
+            <div class="input-group">
+                <label for="signupName">Full Name</label>
+                <input type="text" id="signupName" required placeholder="Enter your full name">
+            </div>
+            <div class="input-group">
+                <label for="signupEmail">Email</label>
+                <input type="email" id="signupEmail" required placeholder="Enter your email">
+            </div>
+            <div class="input-group">
+                <label for="signupPhone">Phone Number</label>
+                <input type="tel" id="signupPhone" required placeholder="Enter 10-digit mobile number" maxlength="10">
+            </div>
+
+            <!-- OTP WALI DETAILS YAHAN SAHI JAGAH PAR SET KAR DI HAIN -->
+            <div class="input-group">
+             <button type="button" id="sendSignupOtp" class="submit-btn" style="margin-top:0" >Send OTP</button>
+            </div>
+            <div class="input-group hidden" id="signupOtpGroup">
+                <label for="signupOtp">OTP</label>
+                <input type="text" id="signupOtp" maxlength="6" inputmode="numeric" placeholder="6-digit OTP">
+            </div>
+
+            <div class="input-group">
+                <label for="signupPassword">Password</label>
+                <input type="password" id="signupPassword" required placeholder="Create password">
+            </div>
+            <!-- Role Selection (Customer or Owner) -->
+            <div class="input-group">
+                <label>I want to join as:</label>
+                <select id="userRole" class="role-select">
+                    <option value="customer">Customer (Want to Rent Vehicle)</option>
+                    <option value="owner">Owner (Want to List Vehicle)</option>
+                </select>
+            </div>
+            <button type="submit" class="submit-btn">Register</button>
+        </form>
+    </div>
+</div>
+
+<!-- Rent Your Item Modal -->
+<div class="modal-overlay" id="rentItemModal">
+    <div class="modal-card rent-modal-card">
+        <button class="close-btn" id="closeRentModal">&times;</button>
+        <h2>List Your Vehicle for Rent</h2>
+        
+        <form id="rentVehicleForm">
+            <!-- Step 1: Vehicle Type -->
+            <div class="input-group">
+                <label for="vehicleCategory">Vehicle Type *</label>
+                <select id="vehicleCategory" required>
+                    <option value="">Select Category</option>
+                    <option value="car">Car 🚗</option>
+                    <option value="bike">Bike 🏍️</option>
+                    <option value="cycle">Cycle 🚲</option>
+                </select>
+            </div>
+
+            <!-- Dynamic Section: Car & Bike Details -->
+            <div id="motorizedFields" class="dynamic-section hidden">
+                <div class="input-group">
+                    <label for="brandSelect">Brand / Company *</label>
+                    <select id="brandSelect">
+                        <option value="">Select Brand</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="modelSelect">Model / Version *</label>
+                    <select id="modelSelect">
+                        <option value="">Select Model</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="mileageRange">Mileage Range (km/l) *</label>
+                    <select id="mileageRange">
+                        <option value="">Select vehicle type first</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="serviceHistory">Servicing History *</label>
+                    <select id="serviceHistory">
+                        <option value="">Total Servicings Done</option>
+                        <option value="1-2">1 - 2 Times</option>
+                        <option value="3-5">3 - 5 Times</option>
+                        <option value="5+">More than 5 Times</option>
+                        <option value="regular">Regularly Serviced</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Dynamic Section: Cycle Details -->
+            <div id="cycleFields" class="dynamic-section hidden">
+                <div class="input-group">
+                    <label for="cycleBrand">Cycle Brand *</label>
+                    <input type="text" id="cycleBrand" placeholder="e.g. Hero, Firefox, Trek">
+                </div>
+                <div class="input-group">
+                    <label for="cycleModel">Cycle Model *</label>
+                    <input type="text" id="cycleModel" placeholder="e.g. Mountain Bike, Hybrid 700C">
+                </div>
+            </div>
+
+            <!-- Common Fields: Price & Photo -->
+            <!-- Common Fields: Price & Photo -->
+<div class="input-group">
+    <label for="rentPrice">Rental Price per Month (₹) *</label>
+    <input type="number" id="rentPrice" required placeholder="e.g. 15000">
+</div>
+<div class="input-group">
+    <label for="ownerCity">Your City *</label>
+    <select id="ownerCity" required>
+        <option value="">Select City</option>
+        <option value="raipur">Raipur</option>
+        <option value="durg">Durg</option>
+        <option value="bhopal">Bhopal</option>
+        <option value="indore">Indore</option>
+        <option value="nagpur">Nagpur</option>
+        <option value="delhi">Delhi</option>
+        <option value="mumbai">Mumbai</option>
+        <option value="bhilai">Bhilai</option>
+    </select>
+</div>
+<div class="input-group">
+    <label for="ownerPhone">Your Phone Number *</label>
+    <input type="tel" id="ownerPhone" required placeholder="Enter 10-digit mobile number" maxlength="10">
+</div>
+
+            <div class="input-group">
+                <label for="vehicleImage">Vehicle Image *</label>
+                <input type="file" id="vehicleImage" accept="image/*" required>
+            </div>
+
+            <button type="submit" class="submit-btn">Post Vehicle for Rent</button>
+        </form>
+    </div>
+</div>
+<!-- Wishlist Modal -->
+<div class="modal-overlay" id="wishlistModal">
+    <div class="modal-card">
+        <button class="close-btn" id="closeWishlistModal">&times;</button>
+        <h2>My Wishlist</h2>
+        <div id="wishlistList" class="wishlist-list"></div>
+    </div>
+</div>
+<!-- Vehicle Details / Pay-to-Unlock Modal -->
+<!-- Contact Owner / Pay-to-Unlock Modal -->
+<div class="modal-overlay" id="detailsModal">
+    <div class="modal-card">
+        <button class="close-btn" id="closeDetailsModal">&times;</button>
+        <img id="detailsImg" class="details-img" alt="Vehicle">
+        <h2 id="detailsTitle"></h2>
+        <p id="detailsPrice" class="price"></p>
+        <div class="public-vehicle-details">
+            <p><strong>Owner:</strong> <span id="detailsOwnerName"></span></p>
+            <p><strong>Mileage:</strong> <span id="detailsMileage"></span></p>
+            <p><strong>Service history:</strong> <span id="detailsService"></span></p>
+        </div>
+
+        <!-- LOCKED STATE -->
+        <div id="detailsLocked" class="details-locked">
+            <p class="locked-text">🔒 Owner's phone number & location hidden</p>
+            <button type="button" id="unlockBtn" class="submit-btn">Pay to Unlock Contact</button>
+        </div>
+
+        <!-- UNLOCKED STATE -->
+        <div id="detailsUnlocked" class="details-unlocked hidden">
+            <p><strong>Owner Phone:</strong> <span id="detailsPhone"></span></p>
+            <p><strong>Location:</strong> <span id="detailsLocation"></span></p>
+        </div>
+    </div>
+</div>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<script src="script.js"></script>
+</body></html> 
