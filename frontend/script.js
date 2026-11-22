@@ -174,51 +174,27 @@ document.addEventListener('DOMContentLoaded', () => {
         loginForm.classList.remove('active');
     });
 });document.addEventListener('DOMContentLoaded', () => {
-        const API = `${API_BASE}/api/auth`;
-        document.getElementById('sendSignupOtp').addEventListener('click', async () => { 
-        
-        
-            
-            const phone = document.getElementById('signupPhone').value.trim();
+    const API = `${API_BASE}/api/auth`;
 
-        if (!/^[6-9]\d{9}$/.test(phone)) {
-            alert('Valid 10-digit mobile number daalo.');
-            return;
-        
+    function saveSession(data) {
+        localStorage.setItem('rc_token', data.token);
+        localStorage.setItem('rc_user', JSON.stringify(data.user));
+        const userBtn = document.getElementById('userBtn');
+        if (userBtn && data.user?.name) {
+            userBtn.innerText = `👤 ${data.user.name.split(' ')[0]}`;
         }
-        try {
-            const response = await fetch(`${API}/send-otp`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, purpose: 'register' })
-            });
-            const data = await response.json();
-
-            if (!data.success) {
-                alert(data.message);
-                return;
-            }
-if (data.devOtp) {
-    document.getElementById('signupOtp').value = data.devOtp;
-}
-            document.getElementById('signupOtpGroup').classList.remove('hidden');
-            alert('OTP request ho gayi. Development mode mein OTP backend terminal par milega.');
-        } catch (error) {
-            console.error(error);
-            alert('Backend se connect nahi ho pa raha.');
-        }
-    });
+        document.getElementById('authModal').classList.remove('active');
+        loadVehicles().catch(console.error);
+    }
 
     document.getElementById('signupForm').addEventListener('submit', async (event) => {
         event.preventDefault();
-
         const body = {
             name: document.getElementById('signupName').value.trim(),
             email: document.getElementById('signupEmail').value.trim(),
             phone: document.getElementById('signupPhone').value.trim(),
             password: document.getElementById('signupPassword').value,
-            role: document.getElementById('userRole').value,
-            otp: document.getElementById('signupOtp').value.trim()
+            role: document.getElementById('userRole').value
         };
 
         try {
@@ -228,95 +204,29 @@ if (data.devOtp) {
                 body: JSON.stringify(body)
             });
             const data = await response.json();
-
             if (!data.success) {
                 alert(data.message);
                 return;
             }
-
             alert('Registration successful!');
-            localStorage.setItem('rc_token', data.token);
-            localStorage.setItem('rc_user', JSON.stringify(data.user));
-            document.getElementById('authModal').classList.remove('active');
-            loadVehicles().catch(console.error);
+            saveSession(data);
         } catch (error) {
             console.error(error);
             alert('Registration ke waqt backend se connect nahi ho pa raha.');
         }
     });
-        // ---------- LOGIN (password + OTP) ----------
-    const loginPasswordGroup = document.getElementById('loginPasswordGroup');
-    const loginOtpGroup = document.getElementById('loginOtpGroup');
-    const sendLoginOtpBtn = document.getElementById('sendLoginOtp');
-    const toggleLoginMode = document.getElementById('toggleLoginMode');
-    let otpMode = false;
-
-    function saveSession(data) {
-    localStorage.setItem('rc_token', data.token);
-    localStorage.setItem('rc_user', JSON.stringify(data.user));
-
-    const userBtn = document.getElementById('userBtn');
-    if (userBtn && data.user?.name) {
-        userBtn.innerText = `👤 ${data.user.name.split(' ')[0]}`;
-    }
-
-    document.getElementById('authModal').classList.remove('active');
-    loadVehicles().catch(console.error);
-}
-
-    toggleLoginMode.addEventListener('click', () => {
-        otpMode = !otpMode;
-        loginPasswordGroup.classList.toggle('hidden', otpMode);
-        loginOtpGroup.classList.toggle('hidden', !otpMode);
-        sendLoginOtpBtn.classList.toggle('hidden', !otpMode);
-        toggleLoginMode.innerText = otpMode ? 'Login with password instead' : 'Login with OTP instead';
-        document.getElementById('loginIdLabel').innerText = otpMode ? 'Phone Number' : 'Email / Phone';
-    });
-
-    sendLoginOtpBtn.addEventListener('click', async () => {
-        const phone = document.getElementById('loginEmail').value.trim();
-        if (!/^[6-9]\d{9}$/.test(phone)) {
-            alert('Valid 10-digit mobile number daalo.');
-            return;
-        }
-        try {
-            const response = await fetch(`${API}/send-otp`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, purpose: 'login' })
-            });
-            const data = await response.json();
-            alert(data.success ? 'OTP bhej diya gaya. (Dev mein backend terminal dekho)' : data.message);
-        } catch (error) {
-            console.error(error);
-            alert('Backend se connect nahi ho pa raha.');
-        }
-    });
 
     document.getElementById('loginForm').addEventListener('submit', async (event) => {
         event.preventDefault();
-        const idValue = document.getElementById('loginEmail').value.trim();
         try {
-            let response;
-            if (otpMode) {
-                response = await fetch(`${API}/login-otp`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        phone: idValue,
-                        otp: document.getElementById('loginOtp').value.trim()
-                    })
-                });
-            } else {
-                response = await fetch(`${API}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        emailOrPhone: idValue,
-                        password: document.getElementById('loginPassword').value
-                    })
-                });
-            }
+            const response = await fetch(`${API}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    emailOrPhone: document.getElementById('loginEmail').value.trim(),
+                    password: document.getElementById('loginPassword').value
+                })
+            });
             const data = await response.json();
             if (!data.success) {
                 alert(data.message);

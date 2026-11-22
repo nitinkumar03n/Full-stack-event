@@ -9,7 +9,6 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Razorpay = require('razorpay');
 require('dotenv').config();
-console.log('OTP DEBUG MODE:', process.env.NODE_ENV);
 
 
 
@@ -64,7 +63,6 @@ const userSchema = new mongoose.Schema({
     role: { type: String, enum: ['customer', 'owner'], default: 'customer' },
     unlockedVehicles: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle' }],
     createdAt: { type: Date, default: Date.now },
-    phoneVerified: { type: Boolean, default: false },
 
 });
 const User = mongoose.model('User', userSchema);
@@ -100,121 +98,7 @@ const paymentSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 const Payment = mongoose.model('Payment', paymentSchema);
-const rateLimit = require('express-rate-limit');
-
-const otpSchema = new mongoose.Schema({
-    phone: { type: String, required: true, index: true },
-    purpose: { type: String, enum: ['register', 'login'], required: true },
-    otpHash: { type: String, required: true },
-    attempts: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now, expires: 300 } // 5 min baad auto delete
-});
-const Otp = mongoose.model('Otp', otpSchema);
-
-const otpLimiter = rateLimit({
-    windowMs: 10 * 60 * 1000,
-    limit: 100,
-    message: { success: false, message: 'Bahut zyada OTP requests. 10 minute baad try karo.' }
-});
-
 const isValidPhone = (p) => /^[6-9]\d{9}$/.test(p);
-const hashOtp = (phone, otp) =>
-    crypto.createHmac('sha256', JWT_SECRET).update(`${phone}:${otp}`).digest('hex');
-
-async function sendOtpSms(phone, otp) {
-    if (process.env.NODE_ENV !== 'production') {
-        console.log(`📱 [DEV] OTP for ${phone}: ${otp}`);
-        return;
-    }
-    const url = `https://control.msg91.com/api/v5/otp?template_id=${process.env.MSG91_TEMPLATE_ID}&mobile=91${phone}&authkey=${process.env.MSG91_AUTH_KEY}&otp=${otp}`;
-    const r = await fetch(url, { method: 'POST' });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok || data.type === 'error') {
-        throw new Error('SMS send failed: ' + JSON.stringify(data));
-    }
-}
-
-async function checkOtp(phone, purpose, otp) {
-    const rec = await Otp.findOne({ phone, purpose });
-    if (!rec) return { ok: false, message: 'OTP expire ho gaya. Dobara bhejo.' };
-    if (rec.attempts >= 5) {
-        await rec.deleteOne();
-        return { ok: false, message: 'Bahut galat attempts. Naya OTP mangao.' };
-    }
-    if (rec.otpHash !== hashOtp(phone, String(otp || ''))) {
-        rec.attempts += 1;
-        await rec.save();
-        return { ok: false, message: 'Galat OTP.' };
-    }
-    await rec.deleteOne(); 
-    return { ok: true };
-}
-
-// Send OTP
-app.post('/api/auth/send-otp', otpLimiter, async (req, res) => {console.log('SEND OTP ROUTE HIT');
-    try {
-        const { phone, purpose } = req.body;
-        if (!isValidPhone(phone) || !['register', 'login'].includes(purpose)) {
-            return res.status(400).json({ success: false, message: 'Valid 10-digit phone number daalo.' });
-        }
-        const user = await User.findOne({ phone });
-        if (purpose === 'register' && user) {
-            return res.status(400).json({ success: false, message: 'Ye number already registered hai.' });
-        }
-        if (purpose === 'login' && !user) {
-            return res.status(404).json({ success: false, message: 'Account nahi mila. Pehle register karo.' });
-        }
-
-        const last = await Otp.findOne({ phone, purpose }).sort({ createdAt: -1 });
-        if (last && Date.now() - last.createdAt.getTime() < 30000) {
-            return res.status(429).json({ success: false, message: '30 second baad dobara try karo.' });
-        }
-
-        await Otp.deleteMany({ phone, purpose });
-        const otp = crypto.randomInt(100000, 1000000).toString();
-        await Otp.create({ phone, purpose, otpHash: hashOtp(phone, otp) });
-        await sendOtpSms(phone, otp);
-
-        res.json({
-    success: true,
-    message: 'OTP bhej diya gaya.',
-    ...(process.env.NODE_ENV === 'development' ? { devOtp: otp } : {})
-});
-            } catch (err) {
-                console.error('SEND OTP CAUGHT:', err);
-        console.error('Send OTP Error:', err);
-        res.status(500).json({
-            success: false,
-            message: process.env.NODE_ENV === 'production'
-                ? 'OTP bhejne mein problem aayi.'
-                : 'OTP DEBUG: ' + err.message
-        });
-    }
-});
-
-// Login with OTP
-app.post('/api/auth/login-otp', async (req, res) => {
-    try {
-        const { phone, otp } = req.body;
-        if (!isValidPhone(phone)) {
-            return res.status(400).json({ success: false, message: 'Invalid phone number.' });
-        }
-        const check = await checkOtp(phone, 'login', otp);
-        if (!check.ok) return res.status(400).json({ success: false, message: check.message });
-
-        const user = await User.findOne({ phone });
-        if (!user) return res.status(404).json({ success: false, message: 'Account nahi mila.' });
-
-        const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '7d' });
-        res.json({
-            success: true, token,
-            user: { id: user._id, name: user.name, email: user.email, role: user.role, unlockedVehicles: user.unlockedVehicles || [] }
-        });
-    } catch (err) {
-        console.error('Login OTP Error:', err);
-        res.status(500).json({ success: false, message: 'Server error.' });
-    }
-});
 
 // Multer Storage Configuration
 const storage = multer.diskStorage({
@@ -262,9 +146,8 @@ const optionalAuthMiddleware = (req, res, next) => {
 // API: Register User
 app.post('/api/auth/register', async (req, res) => {
     try {
-        // 1. req.body se otp bhi le liya aur phone validation lagaya
-        const { name, email, phone, password, role, otp } = req.body;
-        if (!name || !email || !phone || !password || !otp) {
+        const { name, email, phone, password, role } = req.body;
+        if (!name || !email || !phone || !password) {
             return res.status(400).json({ success: false, message: 'All fields are required' });
         }
         if (!isValidPhone(phone)) {
@@ -276,23 +159,15 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ success: false, message: 'User with this email or phone already exists' });
         }
 
-        // 2. Existing user check hone ke baad OTP verification add kar diya
-        const check = await checkOtp(phone, 'register', otp);
-        if (!check.ok) {
-            return res.status(400).json({ success: false, message: check.message });
-        }
-
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 3. User schema me phoneVerified: true kar diya
         const newUser = new User({
             name,
             email,
             phone,
             password: hashedPassword,
-            role: role || 'customer',
-            phoneVerified: true
+            role: role || 'customer'
         });
         await newUser.save();
 

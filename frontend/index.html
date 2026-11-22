@@ -137,20 +137,14 @@
         <form id="loginForm" class="auth-form active">
     <h2>Welcome Back</h2>
     <div class="input-group">
-        <label for="loginEmail" id="loginIdLabel">Email / Phone</label>
+        <label for="loginEmail">Email / Phone</label>
         <input type="text" id="loginEmail" required placeholder="Enter email or phone">
     </div>
-    <div class="input-group" id="loginPasswordGroup">
+    <div class="input-group">
         <label for="loginPassword">Password</label>
-        <input type="password" id="loginPassword" placeholder="Enter password">
+        <input type="password" id="loginPassword" required placeholder="Enter password">
     </div>
-    <div class="input-group hidden" id="loginOtpGroup">
-        <label for="loginOtp">OTP</label>
-        <input type="text" id="loginOtp" maxlength="6" inputmode="numeric" placeholder="6-digit OTP">
-    </div>
-    <button type="button" id="sendLoginOtp" class="submit-btn hidden" style="margin-top:0">Send OTP</button>
     <button type="submit" class="submit-btn">Login</button>
-    <button type="button" id="toggleLoginMode" class="link-btn">Login with OTP instead</button>
 </form>
                <!-- REGISTRATION FORM -->
         <form id="signupForm" class="auth-form">
@@ -166,15 +160,6 @@
             <div class="input-group">
                 <label for="signupPhone">Phone Number</label>
                 <input type="tel" id="signupPhone" required placeholder="Enter 10-digit mobile number" maxlength="10">
-            </div>
-
-            <!-- OTP WALI DETAILS YAHAN SAHI JAGAH PAR SET KAR DI HAIN -->
-            <div class="input-group">
-             <button type="button" id="sendSignupOtp" class="submit-btn" style="margin-top:0" >Send OTP</button>
-            </div>
-            <div class="input-group hidden" id="signupOtpGroup">
-                <label for="signupOtp">OTP</label>
-                <input type="text" id="signupOtp" maxlength="6" inputmode="numeric" placeholder="6-digit OTP">
             </div>
 
             <div class="input-group">
