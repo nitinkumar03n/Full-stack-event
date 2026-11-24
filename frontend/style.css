@@ -773,7 +773,8 @@ nav {
 .booking-card p { color: #555; font-size: 13px; line-height: 1.5; margin-top: 6px; overflow-wrap: anywhere; }
 .booking-card-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .booking-status { text-transform: capitalize; border-radius: 20px; padding: 4px 10px; background: #fff1d6; color: #8b5c00; font-size: 12px; }
-.booking-status.confirmed { background: #e4f8eb; color: #16743a; }
+.booking-status.active { background: #e4f8eb; color: #16743a; }
+.booking-status.ended { background: #eceff1; color: #555; }
 .booking-status.declined, .booking-status.cancelled { background: #f4e7e7; color: #8a3434; }
 .booking-actions { display: flex; gap: 8px; margin-top: 12px; }
 .booking-action { border: 0; border-radius: 7px; background: #f37021; color: #fff; padding: 8px 12px; cursor: pointer; font: inherit; }

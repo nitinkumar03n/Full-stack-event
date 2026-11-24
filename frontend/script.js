@@ -590,25 +590,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const button = event.target.closest('.view-details-btn');
         if (!button) return;
         selectedCard = button.closest('.item-card');
-        const category = selectedCard.classList.contains('car') ? 'car' :
-            selectedCard.classList.contains('bike') ? 'bike' : 'cycle';
+        const category = selectedCard.classList.contains('car') ? 'car' : selectedCard.classList.contains('bike') ? 'bike' : 'cycle';
         document.getElementById('detailsImg').src = selectedCard.dataset.img;
         document.getElementById('detailsTitle').textContent = selectedCard.dataset.title;
         document.getElementById('detailsPrice').textContent = selectedCard.dataset.price;
-        const bookingForm = document.getElementById('bookingRequestForm');
+        const requestForm = document.getElementById('monthlyRentalRequestForm');
         const isOwnerListing = selectedCard.dataset.isOwner === 'true';
-        bookingForm.classList.toggle('hidden', isOwnerListing);
-        document.getElementById('ownerAvailabilityForm').classList.toggle('hidden', !isOwnerListing);
+        requestForm.classList.toggle('hidden', isOwnerListing || selectedCard.dataset.available === 'false');
+        requestForm.reset();
+        document.getElementById('monthlyRentalRate').textContent = `Monthly rent: ${selectedCard.dataset.price}`;
         document.getElementById('detailsVerifiedBadge').classList.toggle('hidden', selectedCard.dataset.ownerVerified !== 'true');
-        document.getElementById('detailsRating').textContent = selectedCard.dataset.reviewCount === '0'
-            ? 'No reviews yet'
-            : `⭐ ${Number(selectedCard.dataset.averageRating).toFixed(1)} from ${selectedCard.dataset.reviewCount} renter review${selectedCard.dataset.reviewCount === '1' ? '' : 's'}`;
-        bookingForm.reset();
-        document.getElementById('bookingEstimate').textContent = 'Choose dates to see the estimated rental.';
-        const today = new Date();
-        const todayValue = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-        document.getElementById('bookingStartDate').min = todayValue;
-        document.getElementById('bookingEndDate').min = todayValue;
+        document.getElementById('detailsRating').textContent = selectedCard.dataset.reviewCount === '0' ? 'No reviews yet' : `⭐ ${Number(selectedCard.dataset.averageRating).toFixed(1)} from ${selectedCard.dataset.reviewCount} renter review${selectedCard.dataset.reviewCount === '1' ? '' : 's'}`;
         document.getElementById('detailsOwnerName').textContent = selectedCard.dataset.ownerName || 'Vehicle owner';
         document.getElementById('detailsMileage').textContent = selectedCard.dataset.mileage || 'Not provided';
         document.getElementById('detailsService').textContent = selectedCard.dataset.service || 'Not provided';
@@ -618,88 +610,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('detailsLocked').classList.toggle('hidden', unlocked);
         document.getElementById('detailsUnlocked').classList.toggle('hidden', !unlocked);
         document.getElementById('unlockBtn').textContent = `Pay ₹${fees[category]} to Unlock Contact`;
-        document.getElementById('ownerAvailabilityStart').min = todayValue;
-        document.getElementById('ownerAvailabilityEnd').min = todayValue;
         modal.classList.add('active');
-        loadVehicleAvailability(selectedCard);
         loadVehicleReviews(selectedCard.dataset.id);
     });
 
-    const availabilityCalendar = document.getElementById('availabilityCalendar');
-    function localDateValue(date) {
-        const adjusted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-        return adjusted.toISOString().slice(0, 10);
-    }
-    async function loadVehicleAvailability(card) {
-        availabilityCalendar.textContent = 'Loading dates...';
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 89);
-        try {
-            const response = await fetch(`${API_BASE}/api/vehicles/${card.dataset.id}/availability?from=${localDateValue(start)}&to=${localDateValue(end)}`);
-            const result = await response.json();
-            if (!response.ok || !result.success) throw new Error(result.message || 'Calendar load nahi hua.');
-            const busy = result.unavailable || [];
-            const busyDate = dateValue => busy.some(period => period.startDate <= dateValue && period.endDate >= dateValue);
-            const chunks = [];
-            for (let offset = 0; offset < 3; offset++) {
-                const monthDate = new Date(start.getFullYear(), start.getMonth() + offset, 1);
-                const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-                const firstDay = monthDate.getDay();
-                let cells = '<div class="calendar-weekday">Sun</div><div class="calendar-weekday">Mon</div><div class="calendar-weekday">Tue</div><div class="calendar-weekday">Wed</div><div class="calendar-weekday">Thu</div><div class="calendar-weekday">Fri</div><div class="calendar-weekday">Sat</div>';
-                for (let blank = 0; blank < firstDay; blank++) cells += '<span class="calendar-empty"></span>';
-                for (let day = 1; day <= monthEnd; day++) {
-                    const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
-                    const value = localDateValue(cellDate);
-                    if (value < localDateValue(start) || value > localDateValue(end)) {
-                        cells += `<span class="calendar-day outside">${day}</span>`;
-                        continue;
-                    }
-                    const unavailable = busyDate(value) || result.isAvailable === false;
-                    const ownerView = card.dataset.isOwner === 'true';
-                    const dayClass = unavailable ? 'unavailable' : 'available';
-                    cells += ownerView
-                        ? `<button type="button" class="calendar-day ${dayClass}" data-calendar-date="${value}" title="${unavailable ? 'Unavailable' : 'Available'}">${day}</button>`
-                        : `<button type="button" class="calendar-day ${dayClass}" data-calendar-date="${value}" ${unavailable ? 'disabled' : ''} title="${unavailable ? 'Unavailable' : 'Available'}">${day}</button>`;
-                }
-                chunks.push(`<section class="calendar-month"><h4>${monthDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</h4><div class="calendar-grid">${cells}</div></section>`);
-            }
-            availabilityCalendar.innerHTML = chunks.join('');
-        } catch (error) {
-            console.error('Availability calendar load error:', error);
-            availabilityCalendar.textContent = error.message || 'Availability load nahi hui.';
-        }
-    }
-    availabilityCalendar.addEventListener('click', event => {
-        const dayButton = event.target.closest('[data-calendar-date]');
-        if (!dayButton || dayButton.disabled) return;
-        const value = dayButton.dataset.calendarDate;
-        if (selectedCard?.dataset.isOwner === 'true') {
-            const startInput = document.getElementById('ownerAvailabilityStart');
-            const endInput = document.getElementById('ownerAvailabilityEnd');
-            if (!startInput.value || (startInput.value && endInput.value)) {
-                startInput.value = value;
-                endInput.value = '';
-            } else {
-                endInput.value = value < startInput.value ? startInput.value : value;
-                if (value < startInput.value) startInput.value = value;
-            }
-            return;
-        }
-        if (!bookingStartDate.value || (bookingStartDate.value && bookingEndDate.value)) {
-            bookingStartDate.value = value;
-            bookingEndDate.value = '';
-            bookingEndDate.min = value;
-        } else if (value >= bookingStartDate.value) {
-            bookingEndDate.value = value;
-        } else {
-            bookingStartDate.value = value;
-            bookingEndDate.value = '';
-            bookingEndDate.min = value;
-        }
-        updateBookingEstimate();
-    });
     async function loadVehicleReviews(vehicleId) {
         const container = document.getElementById('vehicleReviews');
         container.textContent = 'Loading reviews...';
@@ -728,86 +642,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    const bookingStartDate = document.getElementById('bookingStartDate');
-    const bookingEndDate = document.getElementById('bookingEndDate');
-    function updateBookingEstimate() {
-        if (!selectedCard || !bookingStartDate.value || !bookingEndDate.value) {
-            document.getElementById('bookingEstimate').textContent = 'Choose dates to see the estimated rental.';
-            return;
-        }
-        const start = new Date(`${bookingStartDate.value}T00:00:00Z`);
-        const end = new Date(`${bookingEndDate.value}T00:00:00Z`);
-        const days = Math.floor((end - start) / 86400000) + 1;
-        if (days < 1) {
-            document.getElementById('bookingEstimate').textContent = 'End date start date ke barabar ya uske baad honi chahiye.';
-            return;
-        }
-        const estimate = Math.ceil((Number(selectedCard.dataset.priceAmount) * days) / 30);
-        document.getElementById('bookingEstimate').textContent = `${days} day${days === 1 ? '' : 's'} · estimated total ₹${estimate} (monthly rate ke hisaab se)`;
-    }
-    bookingStartDate.addEventListener('change', () => {
-        bookingEndDate.min = bookingStartDate.value || bookingStartDate.min;
-        if (bookingEndDate.value && bookingEndDate.value < bookingStartDate.value) bookingEndDate.value = '';
-        updateBookingEstimate();
-    });
-    bookingEndDate.addEventListener('change', updateBookingEstimate);
-
-    const ownerAvailabilityStart = document.getElementById('ownerAvailabilityStart');
-    const ownerAvailabilityEnd = document.getElementById('ownerAvailabilityEnd');
-    ownerAvailabilityStart.addEventListener('change', () => {
-        ownerAvailabilityEnd.min = ownerAvailabilityStart.value || ownerAvailabilityEnd.min;
-        if (ownerAvailabilityEnd.value && ownerAvailabilityEnd.value < ownerAvailabilityStart.value) ownerAvailabilityEnd.value = '';
-    });
-
-    document.getElementById('ownerAvailabilityForm').addEventListener('submit', async event => {
-        event.preventDefault();
-        if (!selectedCard || !token()) return;
-        const action = event.submitter?.dataset.calendarAction;
-        if (!action) return;
-        try {
-            const response = await fetch(`${API_BASE}/api/vehicles/${selectedCard.dataset.id}/availability`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-                body: JSON.stringify({ startDate: document.getElementById('ownerAvailabilityStart').value, endDate: document.getElementById('ownerAvailabilityEnd').value, action })
-            });
-            const result = await response.json();
-            if (!response.ok || !result.success) return alert(result.message || 'Availability update nahi hui.');
-            alert(result.message);
-            await loadVehicleAvailability(selectedCard);
-        } catch (error) {
-            console.error('Availability update error:', error);
-            alert('Availability update nahi hui. Backend connection check karo.');
-        }
-    });
-
-    document.getElementById('bookingRequestForm').addEventListener('submit', async event => {
+    document.getElementById('monthlyRentalRequestForm').addEventListener('submit', async event => {
         event.preventDefault();
         if (!selectedCard) return;
         if (!token()) {
             modal.classList.remove('active');
             document.getElementById('authModal').classList.add('active');
-            return alert('Booking request bhejne ke liye pehle login karo.');
+            return alert('Monthly rent request bhejne ke liye pehle login karo.');
         }
-        const submitButton = event.currentTarget.querySelector('button[type="submit"]');
-        submitButton.disabled = true;
+        const button = event.currentTarget.querySelector('button[type="submit"]');
+        button.disabled = true;
         try {
-            const response = await fetch(`${API_BASE}/api/bookings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-                body: JSON.stringify({ vehicleId: selectedCard.dataset.id, startDate: bookingStartDate.value, endDate: bookingEndDate.value })
+            const response = await fetch(`${API_BASE}/api/monthly-rentals`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                body: JSON.stringify({ vehicleId: selectedCard.dataset.id })
             });
             const result = await response.json();
-            if (!response.ok || !result.success) return alert(result.message || 'Booking request nahi bheji ja saki.');
+            if (!response.ok || !result.success) return alert(result.message || 'Request nahi bheji ja saki.');
             alert(result.message);
-            event.currentTarget.reset();
-            updateBookingEstimate();
             modal.classList.remove('active');
         } catch (error) {
-            console.error('Booking request error:', error);
-            alert('Booking request nahi bheji ja saki. Backend connection check karo.');
-        } finally {
-            submitButton.disabled = false;
-        }
+            console.error('Monthly rental request error:', error);
+            alert('Request nahi bheji ja saki. Backend connection check karo.');
+        } finally { button.disabled = false; }
     });
 
     const bookingsModal = document.getElementById('bookingsModal');
@@ -815,37 +672,37 @@ document.addEventListener('DOMContentLoaded', () => {
     function escapeHtml(value = '') {
         return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     }
-    function bookingCard(booking, side) {
-        const vehicle = booking.vehicle || {};
-        const counterpart = side === 'owner' ? booking.renter : booking.owner;
+    function monthlyRentalCard(rental, side) {
+        const vehicle = rental.vehicle || {};
+        const counterpart = side === 'owner' ? rental.renter : rental.owner;
         const counterpartHtml = side === 'owner'
             ? `<p>Requested by: ${escapeHtml(counterpart?.name || 'Renter')} · ${escapeHtml(counterpart?.email || '')} · ${escapeHtml(counterpart?.phone || '')}</p>`
             : `<p>Owner: ${escapeHtml(counterpart?.name || 'Vehicle owner')}</p>`;
-        const actions = booking.status === 'pending' && side === 'owner'
-            ? `<button class="booking-action" data-action="accept">Accept</button><button class="booking-action secondary" data-action="decline">Decline</button>`
-            : ['pending', 'confirmed'].includes(booking.status)
-                ? `<button class="booking-action secondary" data-action="cancel">Cancel</button>` : '';
-        const indiaToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-        const canReview = side === 'renter' && booking.status === 'confirmed' && booking.endDate < indiaToday && !booking.reviewSubmitted;
-        const passAction = booking.status === 'confirmed'
-            ? `<div class="booking-actions"><a class="booking-action pass-link" href="/rental-pass.html?bookingId=${encodeURIComponent(booking.id)}" target="_blank" rel="noopener">Open / print rental pass</a></div>` : '';
-        const reviewForm = canReview ? `<form class="booking-review-form"><label>Rating <select name="rating" required><option value="">Choose</option><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label><textarea name="comment" maxlength="1000" placeholder="Share your rental experience"></textarea><button type="submit" class="booking-action">Submit review</button></form>` : '';
-        return `<article class="booking-card" data-booking-id="${escapeHtml(booking.id)}">
-            <div class="booking-card-heading"><strong>${escapeHtml(vehicle.title || 'Vehicle')}</strong><span class="booking-status ${escapeHtml(booking.status)}">${escapeHtml(booking.status)}</span></div>
+        let actions = '';
+        if (rental.status === 'pending' && side === 'owner') actions = '<button class="booking-action" data-action="accept">Accept</button><button class="booking-action secondary" data-action="decline">Decline</button>';
+        else if (rental.status === 'pending' && side === 'renter') actions = '<button class="booking-action secondary" data-action="cancel">Cancel request</button>';
+        else if (rental.status === 'active') actions = '<button class="booking-action secondary" data-action="end">End monthly rental</button>';
+        const pass = ['active', 'ended'].includes(rental.status)
+            ? `<div class="booking-actions"><a class="booking-action pass-link" href="/rental-pass.html?rentalId=${encodeURIComponent(rental.id)}" target="_blank" rel="noopener">Open / print rental pass</a></div>` : '';
+        const canReview = side === 'renter' && rental.status === 'ended' && !rental.reviewSubmitted;
+        const review = canReview ? '<form class="booking-review-form"><label>Rating <select name="rating" required><option value="">Choose</option><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label><textarea name="comment" maxlength="1000" placeholder="Share your rental experience"></textarea><button type="submit" class="booking-action">Submit review</button></form>' : '';
+        const started = rental.startDate ? `Started ${escapeHtml(rental.startDate)}` : 'Waiting for owner approval';
+        return `<article class="booking-card" data-rental-id="${escapeHtml(rental.id)}">
+            <div class="booking-card-heading"><strong>${escapeHtml(vehicle.title || 'Vehicle')}</strong><span class="booking-status ${escapeHtml(rental.status)}">${escapeHtml(rental.status)}</span></div>
             <p>${escapeHtml(vehicle.category || '')}${vehicle.city ? ` · ${escapeHtml(vehicle.city)}` : ''}</p>
-            <p>${escapeHtml(booking.startDate)} to ${escapeHtml(booking.endDate)} · ₹${Number(booking.totalPrice).toLocaleString('en-IN')}</p>
-            ${counterpartHtml}<div class="booking-actions">${actions}</div>${passAction}${reviewForm}
-            ${side === 'renter' && booking.reviewSubmitted ? '<p class="review-submitted">✓ Review submitted</p>' : ''}
+            <p>₹${Number(rental.monthlyPrice).toLocaleString('en-IN')} / month · ${started}</p>
+            ${counterpartHtml}<p class="booking-note">Monthly rent is paid directly to the owner.</p><div class="booking-actions">${actions}</div>${pass}${review}
+            ${side === 'renter' && rental.reviewSubmitted ? '<p class="review-submitted">✓ Review submitted</p>' : ''}
         </article>`;
     }
     async function renderBookings() {
         const currentToken = token();
         if (!currentToken) return;
-        bookingsContent.textContent = 'Loading bookings...';
+        bookingsContent.textContent = 'Loading monthly rentals...';
         try {
-            const response = await fetch(`${API_BASE}/api/bookings`, { headers: { Authorization: `Bearer ${currentToken}` } });
+            const response = await fetch(`${API_BASE}/api/monthly-rentals`, { headers: { Authorization: `Bearer ${currentToken}` } });
             const result = await response.json();
-            if (!response.ok || !result.success) throw new Error(result.message || 'Bookings load nahi hue.');
+            if (!response.ok || !result.success) throw new Error(result.message || 'Monthly rentals load nahi hue.');
             const renterItems = result.asRenter || [];
             const ownerItems = result.forMyVehicles || [];
             const verificationResponse = await fetch(`${API_BASE}/api/verification/status`, { headers: { Authorization: `Bearer ${currentToken}` } });
@@ -854,18 +711,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('verificationStatus').textContent = verification.status;
                 document.getElementById('requestVerificationBtn').classList.toggle('hidden', ['pending', 'verified'].includes(verification.status));
             }
-            bookingsContent.innerHTML = `<section><h3>Requests for my listings</h3>${ownerItems.length ? ownerItems.map(item => bookingCard(item, 'owner')).join('') : '<p class="empty-bookings">Abhi aapki listings par koi booking request nahi hai.</p>'}</section>
-                <section><h3>My rental requests</h3>${renterItems.length ? renterItems.map(item => bookingCard(item, 'renter')).join('') : '<p class="empty-bookings">Aapne abhi koi booking request nahi bheji.</p>'}</section>`;
+            bookingsContent.innerHTML = `<section><h3>Requests for my listings</h3>${ownerItems.length ? ownerItems.map(item => monthlyRentalCard(item, 'owner')).join('') : '<p class="empty-bookings">Abhi koi monthly rental request nahi hai.</p>'}</section><section><h3>My monthly rent requests</h3>${renterItems.length ? renterItems.map(item => monthlyRentalCard(item, 'renter')).join('') : '<p class="empty-bookings">Aapne abhi request nahi bheji.</p>'}</section>`;
         } catch (error) {
-            console.error('Bookings load error:', error);
-            bookingsContent.textContent = error.message || 'Bookings load nahi hue.';
+            console.error('Monthly rentals load error:', error);
+            bookingsContent.textContent = error.message || 'Monthly rentals load nahi hue.';
         }
     }
     document.getElementById('myBookingsBtn').addEventListener('click', async () => {
-        if (!token()) {
-            document.getElementById('authModal').classList.add('active');
-            return;
-        }
+        if (!token()) { document.getElementById('authModal').classList.add('active'); return; }
         bookingsModal.classList.add('active');
         await renderBookings();
     });
@@ -888,44 +741,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = event.target.closest('.booking-review-form');
         if (!form) return;
         event.preventDefault();
-        const card = form.closest('[data-booking-id]');
+        const card = form.closest('[data-rental-id]');
         const button = form.querySelector('button[type="submit"]');
         button.disabled = true;
         try {
-            const response = await fetch(`${API_BASE}/api/bookings/${card.dataset.bookingId}/review`, {
+            const response = await fetch(`${API_BASE}/api/monthly-rentals/${card.dataset.rentalId}/review`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
                 body: JSON.stringify({ rating: form.elements.rating.value, comment: form.elements.comment.value })
             });
             const result = await response.json();
             if (!response.ok || !result.success) return alert(result.message || 'Review submit nahi hua.');
-            alert(result.message);
-            await renderBookings();
-            await loadVehicles();
-        } catch (error) {
-            console.error('Review submit error:', error);
-            alert('Review submit nahi hua.');
-        } finally { button.disabled = false; }
+            alert(result.message); await renderBookings(); await loadVehicles();
+        } catch (error) { console.error('Review submit error:', error); alert('Review submit nahi hua.'); }
+        finally { button.disabled = false; }
     });
     bookingsContent.addEventListener('click', async event => {
-        const actionButton = event.target.closest('[data-action]');
-        if (!actionButton) return;
-        const card = actionButton.closest('[data-booking-id]');
-        actionButton.disabled = true;
+        const button = event.target.closest('[data-action]');
+        if (!button) return;
+        const card = button.closest('[data-rental-id]');
+        button.disabled = true;
         try {
-            const response = await fetch(`${API_BASE}/api/bookings/${card.dataset.bookingId}/respond`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-                body: JSON.stringify({ action: actionButton.dataset.action })
+            const response = await fetch(`${API_BASE}/api/monthly-rentals/${card.dataset.rentalId}/respond`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                body: JSON.stringify({ action: button.dataset.action })
             });
             const result = await response.json();
-            if (!response.ok || !result.success) return alert(result.message || 'Booking update nahi hui.');
+            if (!response.ok || !result.success) return alert(result.message || 'Monthly rental update nahi hui.');
             await renderBookings();
-        } catch (error) {
-            console.error('Booking update error:', error);
-            alert('Booking update nahi hui. Backend connection check karo.');
-        } finally {
-            actionButton.disabled = false;
-        }
+        } catch (error) { console.error('Monthly rental update error:', error); alert('Monthly rental update nahi hui. Backend connection check karo.'); }
+        finally { button.disabled = false; }
     });
 
     document.getElementById('closeDetailsModal').addEventListener('click', () => modal.classList.remove('active'));

@@ -9,26 +9,27 @@
 <body class="rental-pass-page">
     <main class="rental-pass-card">
         <a class="pass-back-link" href="/">← Rent Connect India</a>
-        <div id="passLoading">Loading confirmed booking…</div>
+        <div id="passLoading">Loading monthly rental pass…</div>
         <section id="passDocument" class="hidden">
             <div class="pass-brand">RENT CONNECT INDIA</div>
-            <p class="pass-kicker">RENTAL TRIP PASS · BOOKING CONFIRMATION</p>
+            <p class="pass-kicker">MONTHLY RENTAL PASS</p>
             <h1 id="passVehicle"></h1>
-            <div id="passStatus" class="pass-status">CONFIRMED BOOKING</div>
+            <div id="passStatus" class="pass-status">MONTHLY RENTAL</div>
             <dl class="pass-details">
                 <div><dt>Renter</dt><dd id="passRenter"></dd></div>
                 <div><dt>Vehicle registration</dt><dd id="passRegistration"></dd></div>
-                <div><dt>Rental period</dt><dd><span id="passDates"></span></dd></div>
+                <div><dt>Started on</dt><dd><span id="passDates"></span></dd></div>
+                <div><dt>Monthly rent</dt><dd id="passMonthlyRent"></dd></div>
                 <div><dt>Owner / contact</dt><dd><span id="passOwner"></span> · <a id="passPhone"></a></dd></div>
                 <div><dt>Pickup city</dt><dd id="passLocation"></dd></div>
-                <div><dt>Booking reference</dt><dd id="passReference"></dd></div>
+                <div><dt>Rental reference</dt><dd id="passReference"></dd></div>
             </dl>
-            <div class="pass-notice"><strong>Please note:</strong> This pass confirms the platform booking only. It is not a government permit or a replacement for the rider’s valid driving licence and the vehicle’s official documents. Show the relevant current documents from DigiLocker/mParivahan or their originals when asked.</div>
+            <div class="pass-notice"><strong>Please note:</strong> This pass records the monthly rental details shared on Rent Connect. It is not a government permit or a replacement for the rider’s valid driving licence and the vehicle’s official documents. Carry the current original or DigiLocker/mParivahan documents. The renter and owner arrange monthly rent directly.</div>
             <button type="button" id="printPassBtn" class="submit-btn">Print / Save as PDF</button>
             <p id="passError" class="pass-error hidden"></p>
         </section>
         <p id="passMessage" class="pass-message"></p>
-        <p class="pass-share-help">To share this pass, print/save it as PDF and attach it in WhatsApp. The owner can send the vehicle papers separately in the same chat.</p>
+        <p class="pass-share-help">To share this pass, print/save it as PDF and attach it in WhatsApp. Save this pass as PDF and share it with the owner/renter on WhatsApp. The owner can share the vehicle papers separately.</p>
     </main>
     <script src="rental-pass.js"></script>
 </body>

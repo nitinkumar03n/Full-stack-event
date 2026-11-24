@@ -111,7 +111,7 @@
     <div class="items-heading-row">
         <h2 class="section-title">Available Rentals</h2>
         <div class="rental-heading-actions">
-            <button type="button" id="myBookingsBtn" class="clear-filters-btn hidden">My bookings & requests</button>
+            <button type="button" id="myBookingsBtn" class="clear-filters-btn hidden">My monthly rentals</button>
             <div class="rental-filters">
             <label for="budgetFilter">Monthly budget</label>
             <select id="budgetFilter">
@@ -324,35 +324,19 @@
             <p><strong>Location:</strong> <span id="detailsLocation"></span></p>
         </div>
 
-        <section class="availability-section">
-            <h3>Availability calendar</h3>
-            <p class="booking-note"><span class="calendar-key available-key">Available</span><span class="calendar-key unavailable-key">Unavailable</span></p>
-            <div id="availabilityCalendar" class="availability-calendar" aria-live="polite">Loading dates...</div>
+        <section class="monthly-rental-info">
+            <h3>Monthly rental</h3>
+            <p>Rent is paid directly by the renter to the owner each month. Rent Connect does not collect monthly rent.</p>
         </section>
-        <form id="ownerAvailabilityForm" class="booking-form hidden">
-            <h3>Manage your available dates</h3>
-            <div class="booking-date-fields">
-                <label>Start date<input id="ownerAvailabilityStart" type="date" required></label>
-                <label>End date<input id="ownerAvailabilityEnd" type="date" required></label>
-            </div>
-            <div class="booking-actions">
-                <button type="submit" class="booking-action" data-calendar-action="block">Mark unavailable</button>
-                <button type="submit" class="booking-action secondary" data-calendar-action="open">Mark available</button>
-            </div>
-        </form>
         <div class="vehicle-reviews-section">
             <h3>Renter reviews</h3>
             <div id="vehicleReviews">Loading reviews...</div>
         </div>
-        <form id="bookingRequestForm" class="booking-form hidden">
-            <h3>Request these dates</h3>
-            <div class="booking-date-fields">
-                <label>Start date<input id="bookingStartDate" type="date" required></label>
-                <label>End date<input id="bookingEndDate" type="date" required></label>
-            </div>
-            <p id="bookingEstimate" class="booking-estimate">Choose dates to see the estimated rental.</p>
-            <button type="submit" class="submit-btn">Send booking request</button>
-            <p class="booking-note">Payment is not collected here. The owner must confirm your request.</p>
+        <form id="monthlyRentalRequestForm" class="booking-form hidden">
+            <h3>Request this vehicle for monthly rent</h3>
+            <p id="monthlyRentalRate" class="booking-estimate"></p>
+            <button type="submit" class="submit-btn">Send monthly rental request</button>
+            <p class="booking-note">Owner approval is required. You and the owner arrange monthly payment directly.</p>
         </form>
     </div>
 </div>
@@ -360,14 +344,14 @@
 <div class="modal-overlay" id="bookingsModal">
     <div class="modal-card bookings-modal-card">
         <button class="close-btn" id="closeBookingsModal">&times;</button>
-        <h2>My bookings & requests</h2>
-        <p class="booking-note">Manage requests for your listings and check your rental status.</p>
+        <h2>My monthly rentals</h2>
+        <p class="booking-note">Accept requests for your listings, manage active monthly rentals, and open the rental pass.</p>
         <div class="verification-panel">
             <p>Owner verification: <strong id="verificationStatus">Not verified</strong></p>
             <button type="button" id="requestVerificationBtn" class="booking-action secondary">Request verified badge</button>
             <small>Badge approval is reviewed manually.</small>
         </div>
-        <div id="bookingsContent" class="bookings-content">Loading bookings...</div>
+        <div id="bookingsContent" class="bookings-content">Loading monthly rentals...</div>
     </div>
 </div>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
