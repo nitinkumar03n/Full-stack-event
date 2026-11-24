@@ -324,6 +324,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Category Selection Change Listener
     vehicleCategory.addEventListener('change', (e) => {
         const selected = e.target.value;
+        const registrationInput = document.getElementById('vehicleRegistration');
+        registrationInput.required = selected === 'bike';
+        document.getElementById('registrationGroup').classList.toggle('hidden', selected === 'cycle');
+        document.getElementById('registrationHint').textContent = selected === 'bike' ? '(required for bike pass)' : '(optional)';
         updateMileageOptions(selected);
         brandSelect.innerHTML = '<option value="">Select Brand</option>';
         modelSelect.innerHTML = '<option value="">Select Model</option>';
@@ -474,6 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('category', vehicleCategory.value);
         formData.append('brand', brandSelect.value);
         formData.append('model', modelSelect.value);
+        formData.append('registrationNumber', document.getElementById('vehicleRegistration').value.trim().toUpperCase());
         formData.append('cycleBrand', document.getElementById('cycleBrand').value);
         formData.append('cycleModel', document.getElementById('cycleModel').value);
         formData.append('mileage', document.getElementById('mileageRange').value);
@@ -822,12 +827,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `<button class="booking-action secondary" data-action="cancel">Cancel</button>` : '';
         const indiaToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
         const canReview = side === 'renter' && booking.status === 'confirmed' && booking.endDate < indiaToday && !booking.reviewSubmitted;
+        const passAction = booking.status === 'confirmed'
+            ? `<div class="booking-actions"><a class="booking-action pass-link" href="/rental-pass.html?bookingId=${encodeURIComponent(booking.id)}" target="_blank" rel="noopener">Open / print rental pass</a></div>` : '';
         const reviewForm = canReview ? `<form class="booking-review-form"><label>Rating <select name="rating" required><option value="">Choose</option><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label><textarea name="comment" maxlength="1000" placeholder="Share your rental experience"></textarea><button type="submit" class="booking-action">Submit review</button></form>` : '';
         return `<article class="booking-card" data-booking-id="${escapeHtml(booking.id)}">
             <div class="booking-card-heading"><strong>${escapeHtml(vehicle.title || 'Vehicle')}</strong><span class="booking-status ${escapeHtml(booking.status)}">${escapeHtml(booking.status)}</span></div>
             <p>${escapeHtml(vehicle.category || '')}${vehicle.city ? ` · ${escapeHtml(vehicle.city)}` : ''}</p>
             <p>${escapeHtml(booking.startDate)} to ${escapeHtml(booking.endDate)} · ₹${Number(booking.totalPrice).toLocaleString('en-IN')}</p>
-            ${counterpartHtml}<div class="booking-actions">${actions}</div>${reviewForm}
+            ${counterpartHtml}<div class="booking-actions">${actions}</div>${passAction}${reviewForm}
             ${side === 'renter' && booking.reviewSubmitted ? '<p class="review-submitted">✓ Review submitted</p>' : ''}
         </article>`;
     }

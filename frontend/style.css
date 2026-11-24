@@ -815,3 +815,27 @@ button.calendar-day { cursor: pointer; }
 @media (max-width: 520px) { .availability-calendar { grid-template-columns: 1fr; } }
 
 #detailsModal .modal-card { max-height: 90vh; overflow-y: auto; }
+
+
+.rental-pass-page { min-height: 100vh; padding: 28px 14px; background: #f3f4f6; }
+.rental-pass-card { width: min(100%, 720px); margin: 0 auto; padding: 28px; background: #fff; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,.08); color: #222; }
+.pass-back-link { color: #e05f13; display: inline-block; margin-bottom: 20px; }
+.pass-brand { color: #f37021; font-weight: 800; letter-spacing: 1px; }
+.pass-kicker { color: #626a73; font-size: 12px; letter-spacing: 1px; margin: 14px 0 6px; }
+.pass-status { display: inline-block; margin-top: 12px; padding: 6px 12px; border-radius: 20px; background: #e4f8eb; color: #16743a; font-size: 12px; font-weight: 700; }
+.pass-details { margin: 20px 0; border-top: 1px solid #e5e7eb; }
+.pass-details div { display: grid; grid-template-columns: minmax(130px, .7fr) 1.3fr; gap: 10px; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+.pass-details dt { color: #666; }
+.pass-details dd { font-weight: 600; overflow-wrap: anywhere; }
+.pass-details a { color: #c84d0c; }
+.pass-notice { padding: 14px; border: 1px solid #f2d2bd; border-radius: 10px; background: #fff8f3; color: #4b4039; line-height: 1.55; font-size: 13px; margin-bottom: 18px; }
+.pass-message { color: #a33c1a; margin-top: 16px; }
+@media print {
+    body.rental-pass-page { background: #fff; padding: 0; }
+    .rental-pass-card { box-shadow: none; border: 1px solid #ccc; width: 100%; padding: 20px; }
+    .pass-back-link, #printPassBtn { display: none !important; }
+}
+@media (max-width: 520px) { .rental-pass-card { padding: 20px; } .pass-details div { grid-template-columns: 1fr; gap: 4px; } }
+
+.pass-status.upcoming { background: #e8f0ff; color: #2458a6; }
+.pass-status.expired { background: #f4e7e7; color: #8a3434; }

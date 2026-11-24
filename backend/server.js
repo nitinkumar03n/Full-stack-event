@@ -88,6 +88,7 @@ const vehicleSchema = new mongoose.Schema({
     price: { type: Number, required: true },
     brand: { type: String, default: '' },
     modelName: { type: String, default: '' },
+    registrationNumber: { type: String, trim: true, uppercase: true, default: '' },
     mileage: { type: String, default: 'N/A' },
     service: { type: String, default: 'N/A' },
     ownerPhone: { type: String, required: true },
@@ -337,6 +338,7 @@ app.post('/api/vehicles', authMiddleware, upload.single('vehicleImage'), async (
         }
         const {
             category,
+            registrationNumber,
             brand,
             model,
             cycleBrand,
@@ -348,7 +350,7 @@ app.post('/api/vehicles', authMiddleware, upload.single('vehicleImage'), async (
             phone
         } = req.body;
 
-        if (!['car', 'bike', 'cycle'].includes(category) || !Number.isFinite(Number(price)) || Number(price) <= 0 || !city || !isValidPhone(phone)) {
+        if (!['car', 'bike', 'cycle'].includes(category) || !Number.isFinite(Number(price)) || Number(price) <= 0 || !city || !isValidPhone(phone) || (category === 'bike' && !/^[A-Z0-9 -]{5,15}$/i.test(registrationNumber || ''))) {
             return res.status(400).json({ success: false, message: 'Valid category, positive monthly price, city, and 10-digit phone required.' });
         }
 
@@ -373,6 +375,7 @@ app.post('/api/vehicles', authMiddleware, upload.single('vehicleImage'), async (
             title,
             brand: category === 'cycle' ? cycleBrand : brand,
             modelName: category === 'cycle' ? cycleModel : model,
+            registrationNumber: category === 'cycle' ? '' : (registrationNumber || '').trim().toUpperCase(),
             price: Number(price),
             mileage: mileage || 'N/A',
             service: service || 'N/A',
@@ -683,6 +686,42 @@ app.get('/api/bookings', authMiddleware, async (req, res) => {
     } catch (err) {
         console.error('Load bookings error:', err);
         res.status(500).json({ success: false, message: 'Bookings load nahi ho sake.' });
+    }
+});
+
+app.get('/api/bookings/:bookingId/pass', authMiddleware, async (req, res) => {
+    try {
+        if (!mongoose.isValidObjectId(req.params.bookingId)) return res.status(400).json({ success: false, message: 'Booking ID invalid hai.' });
+        const booking = await Booking.findById(req.params.bookingId)
+            .populate('vehicle', 'title category registrationNumber ownerPhone ownerLocation')
+            .populate('owner', 'name')
+            .populate('renter', 'name').lean();
+        if (!booking) return res.status(404).json({ success: false, message: 'Booking nahi mili.' });
+        const isRenter = booking.renter?._id?.toString() === req.userId.toString();
+        const isOwner = booking.owner?._id?.toString() === req.userId.toString();
+        if (!isRenter && !isOwner) return res.status(403).json({ success: false, message: 'Is rental pass ko dekhne ki permission nahi hai.' });
+        if (booking.status !== 'confirmed') return res.status(409).json({ success: false, message: 'Rental pass sirf owner ke confirmed booking accept karne ke baad banega.' });
+        const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        const startValue = booking.startDate.toISOString().slice(0, 10);
+        const endValue = booking.endDate.toISOString().slice(0, 10);
+        const validity = startValue > today ? 'upcoming' : endValue < today ? 'expired' : 'active';
+        res.json({ success: true, pass: {
+            bookingId: booking._id.toString(),
+            status: booking.status,
+            validity,
+            renterName: booking.renter?.name || 'Renter',
+            vehicleTitle: booking.vehicle?.title || 'Rental vehicle',
+            vehicleCategory: booking.vehicle?.category || '',
+            registrationNumber: booking.vehicle?.registrationNumber || 'Not recorded',
+            startDate: booking.startDate.toISOString().slice(0, 10),
+            endDate: booking.endDate.toISOString().slice(0, 10),
+            ownerName: booking.owner?.name || 'Vehicle owner',
+            ownerPhone: booking.vehicle?.ownerPhone || '',
+            ownerLocation: booking.vehicle?.ownerLocation || ''
+        } });
+    } catch (err) {
+        console.error('Rental pass load error:', err);
+        res.status(500).json({ success: false, message: 'Rental pass load nahi ho saka.' });
     }
 });
 
