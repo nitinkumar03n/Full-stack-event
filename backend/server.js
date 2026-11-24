@@ -281,7 +281,7 @@ app.get('/api/vehicles', optionalAuthMiddleware, async (req, res) => {
                 service: v.service,
                 img: v.img,
                 ownerName: v.owner?.name || 'Vehicle owner',
-                ownerLocation: (isUnlocked || isOwner) ? v.ownerLocation : null,
+                ownerLocation: v.ownerLocation,
                 ownerPhone: (isUnlocked || isOwner) ? v.ownerPhone : null,
                 isUnlocked: isUnlocked || isOwner
             };

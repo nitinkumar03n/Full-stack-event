@@ -35,21 +35,9 @@
 
             <!-- Stretched Search Bar -->
             <div class="nav-search">
-                <input type="text" id="searchInput" aria-label="Search">
+                <input type="search" id="searchInput" aria-label="Search vehicles" placeholder="Search by vehicle, model, owner, or city">
 
-                <div class="search-hint" id="searchHint">
-                    <span>Search</span>
-                    <div class="word-window">
-                        <div class="word-list">
-                            <span>Cars</span>
-                            <span>Bikes</span>
-                            <span>Cycles</span>
-                            <span>Cars</span>
-                        </div>
-                    </div>
-                </div>
-
-                <button type="button">⌕</button>
+                <button type="button" id="searchBtn" aria-label="Apply search">⌕</button>
             </div>
 
             <!-- Simple Wishlist Section -->
@@ -102,14 +90,17 @@
         <p>Affordable, reliable, and quick rentals across India.</p>
         
         <!-- Category Quick Filters -->
-        <div class="category-filters">
-            <button class="category-btn active">
+        <div class="category-filters" aria-label="Filter by vehicle type">
+            <button class="category-btn active" type="button" data-category="all">
+                <span>✨</span> All Vehicles
+            </button>
+            <button class="category-btn" type="button" data-category="car">
                 <span>🚗</span> Cars
             </button>
-            <button class="category-btn">
+            <button class="category-btn" type="button" data-category="bike">
                 <span>🏍️</span> Bikes
             </button>
-            <button class="category-btn">
+            <button class="category-btn" type="button" data-category="cycle">
                 <span>🚲</span> Cycles
             </button>
         </div>
@@ -117,11 +108,24 @@
 </section>
 <!-- Rental Items Section -->
 <section class="items-section">
-    <h2 class="section-title">Available Rentals</h2>
-    <div class="items-grid" id="itemsGrid">
-        
-        <p>Loading available vehicles...</p>
+    <div class="items-heading-row">
+        <h2 class="section-title">Available Rentals</h2>
+        <div class="rental-filters">
+            <label for="budgetFilter">Monthly budget</label>
+            <select id="budgetFilter">
+                <option value="">Any budget</option>
+                <option value="1000">Up to ₹1,000</option>
+                <option value="3000">Up to ₹3,000</option>
+                <option value="5000">Up to ₹5,000</option>
+                <option value="10000">Up to ₹10,000</option>
+                <option value="20000">Up to ₹20,000</option>
+                <option value="50000">Up to ₹50,000</option>
+            </select>
+            <button type="button" id="clearFiltersBtn" class="clear-filters-btn">Clear filters</button>
+        </div>
     </div>
+    <p id="resultsSummary" class="results-summary" aria-live="polite">Loading available vehicles...</p>
+    <div class="items-grid" id="itemsGrid"></div>
 </section><!-- Login & Registration Modal -->
 <div class="modal-overlay" id="authModal">
     <div class="modal-card">

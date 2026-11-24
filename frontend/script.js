@@ -3,19 +3,81 @@ const API_BASE = window.RC_API_BASE ||
         ? 'http://127.0.0.1:5001'
         : '');
 
-   document.addEventListener('DOMContentLoaded', () => {
-    const searchInput = document.getElementById('searchInput');
-    const searchHint = document.getElementById('searchHint');
+function applyVehicleFilters() {
+    const grid = document.getElementById('itemsGrid');
+    if (!grid) return;
 
-    if (searchInput && searchHint) {
-        searchInput.addEventListener('input', () => {
-            if (searchInput.value.trim().length > 0) {
-                searchHint.style.visibility = 'hidden';
-            } else {
-                searchHint.style.visibility = 'visible';
-            }
-        });
+    const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+    const selectedCity = (document.getElementById('userCity')?.value || '').toLowerCase();
+    const maxBudgetValue = document.getElementById('budgetFilter')?.value || '';
+    const maxBudget = maxBudgetValue ? Number(maxBudgetValue) : Infinity;
+    const selectedCategory = document.querySelector('.category-btn.active')?.dataset.category || 'all';
+    const cards = Array.from(grid.querySelectorAll('.item-card'));
+    let visibleCount = 0;
+
+    for (const card of cards) {
+        const searchText = [
+            card.dataset.title,
+            card.dataset.category,
+            card.dataset.ownerName,
+            card.dataset.ownerLocation,
+            card.dataset.mileage,
+            card.dataset.service
+        ].join(' ').toLowerCase();
+        const price = Number(card.dataset.priceAmount);
+        const matches = (!query || searchText.includes(query)) &&
+            (!selectedCity || card.dataset.ownerLocation === selectedCity) &&
+            (selectedCategory === 'all' || card.dataset.category === selectedCategory) &&
+            (price <= maxBudget);
+
+        card.style.display = matches ? '' : 'none';
+        if (matches) visibleCount += 1;
     }
+
+    const summary = document.getElementById('resultsSummary');
+    if (summary) {
+        if (!cards.length) {
+            summary.textContent = 'Abhi koi available vehicle listed nahi hai.';
+        } else if (!visibleCount) {
+            summary.textContent = 'In filters se koi vehicle nahi mila. Filters badal kar dekho.';
+        } else {
+            summary.textContent = `${visibleCount} rental${visibleCount === 1 ? '' : 's'} available`;
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const citySelect = document.getElementById('userCity');
+    const budgetFilter = document.getElementById('budgetFilter');
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    const categoryBtns = document.querySelectorAll('.category-btn');
+
+    searchInput?.addEventListener('input', applyVehicleFilters);
+    searchInput?.addEventListener('keydown', event => {
+        if (event.key === 'Enter') applyVehicleFilters();
+    });
+    searchBtn?.addEventListener('click', applyVehicleFilters);
+    citySelect?.addEventListener('change', applyVehicleFilters);
+    budgetFilter?.addEventListener('change', applyVehicleFilters);
+
+    categoryBtns.forEach(button => {
+        button.addEventListener('click', () => {
+            categoryBtns.forEach(item => item.classList.remove('active'));
+            button.classList.add('active');
+            applyVehicleFilters();
+        });
+    });
+
+    clearFiltersBtn?.addEventListener('click', () => {
+        if (searchInput) searchInput.value = '';
+        if (citySelect) citySelect.value = '';
+        if (budgetFilter) budgetFilter.value = '';
+        categoryBtns.forEach(button => button.classList.toggle('active', button.dataset.category === 'all'));
+        applyVehicleFilters();
+        searchInput?.blur();
+    });
 });
  document.addEventListener('DOMContentLoaded', () => {
     const countElement = document.getElementById('wishlistCount');
@@ -100,32 +162,6 @@ const API_BASE = window.RC_API_BASE ||
     syncHeartIcons();
 });
 document.addEventListener('DOMContentLoaded', () => {
-    const categoryBtns = document.querySelectorAll('.category-btn');
-
-    categoryBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            // Active button class update
-            categoryBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            // Get selected category name (cars, bikes, cycles)
-            const category = btn.textContent.trim().toLowerCase();
-
-            // Filter logic
-            document.querySelectorAll('.item-card').forEach(card => {
-                if (category.includes('cars') && card.classList.contains('car')) {
-                    card.style.display = 'block';
-                } else if (category.includes('bikes') && card.classList.contains('bike')) {
-                    card.style.display = 'block';
-                } else if (category.includes('cycles') && card.classList.contains('cycle')) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none'; // Baki items hide ho jayenge
-                }
-            });
-        });
-    });
-});document.addEventListener('DOMContentLoaded', () => {
     // Modal Open/Close Controls
     const userBtn = document.getElementById('userBtn');
     const authModal = document.getElementById('authModal');
@@ -342,6 +378,8 @@ async function loadVehicles() {
         Object.assign(card.dataset, {
             id: vehicle.id,
             title: vehicle.title,
+            category: vehicle.category,
+            priceAmount: vehicle.price,
             price: `₹${vehicle.price} / month`,
             img: vehicle.img,
             ownerPhone: vehicle.ownerPhone || '',
@@ -370,7 +408,7 @@ async function loadVehicles() {
         price.textContent = `₹${vehicle.price} / month`;
         const publicInfo = document.createElement('p');
         publicInfo.className = 'public-card-details';
-        publicInfo.textContent = `Owner: ${vehicle.ownerName || 'Vehicle owner'} · Mileage: ${vehicle.mileage || 'Not provided'} · Service: ${vehicle.service || 'Not provided'}`;
+        publicInfo.textContent = `City: ${vehicle.ownerLocation || 'Not provided'} · Owner: ${vehicle.ownerName || 'Vehicle owner'} · Mileage: ${vehicle.mileage || 'Not provided'} · Service: ${vehicle.service || 'Not provided'}`;
         const details = document.createElement('button');
         details.type = 'button';
         details.className = 'view-details-btn';
@@ -379,8 +417,7 @@ async function loadVehicles() {
         card.append(heart, image, info);
         grid.append(card);
     }
-    if (!data.vehicles.length) grid.textContent = 'Abhi koi available vehicle listed nahi hai.';
-    document.getElementById('userCity')?.dispatchEvent(new Event('change'));
+    applyVehicleFilters();
     document.querySelectorAll('.wishlist-toggle').forEach(btn => {
         const saved = JSON.parse(localStorage.getItem('rc_wishlist') || '[]');
         if (saved.some(item => item.title === btn.closest('.item-card').dataset.title)) {
@@ -453,27 +490,6 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Listing save nahi hui. Backend terminal ka error dekho.');
         }
     });
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    const userCitySelect = document.getElementById('userCity');
-    const itemsGrid = document.getElementById('itemsGrid');
-
-    // User apni city select kare -> sirf usi city ke products dikhein
-    function applyLocationFilter() {
-        const selectedCity = userCitySelect.value;
-        document.querySelectorAll('.item-card').forEach(card => {
-            const cardCity = (card.dataset.ownerLocation || card.dataset.location || '').toLowerCase();
-if (!selectedCity || cardCity === selectedCity) {
-                card.style.display = '';
-            } else {
-                card.style.display = 'none';
-            }
-        });
-    }
-
-    userCitySelect.addEventListener('change', applyLocationFilter);
-
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -550,6 +566,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadVehicles().catch(error => {
         console.error('Vehicle load error:', error);
         grid.textContent = 'Vehicle load nahi hue. Backend server check karo.';
+        const summary = document.getElementById('resultsSummary');
+        if (summary) summary.textContent = 'Vehicle list load nahi hui.';
     });
     setInterval(() => checkOwnerAvailability().catch(console.error), 60 * 1000);
 

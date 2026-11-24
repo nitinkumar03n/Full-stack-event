@@ -74,44 +74,6 @@ nav {
   z-index: 2;
 }
 
-/* Jab search box me type ya focus ho, hint text apne aap chhup jaye */
-.nav-search:focus-within .search-hint {
-    display: none !important;
-}
-
-.search-hint {
-  position: absolute;
-  left: 20px;
-  display: flex;
-  gap: 6px;
-  color: #6b7280;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.word-window {
-  height: 21px;
-  overflow: hidden;
-}
-
-.word-list {
-  display: flex;
-  flex-direction: column;
-  animation: changeWord 6s infinite;
-}
-
-.word-list span {
-  height: 21px;
-  line-height: 21px;
-}
-
-@keyframes changeWord {
-  0%, 25% { transform: translateY(0); }
-  33%, 58% { transform: translateY(-21px); }
-  66%, 91% { transform: translateY(-42px); }
-  100% { transform: translateY(-63px); }
-}
-
 .nav-search button {
   position: absolute;
   right: 10px;
@@ -310,8 +272,63 @@ nav {
     background: #f37021;
     border-color: #f37021;
     transform: translateY(-2px);
-}.items-section {
+}
+
+.items-section {
     padding: 20px 40px;
+}
+
+.items-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.rental-filters {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    color: #555;
+    font-size: 14px;
+}
+
+.rental-filters select,
+.clear-filters-btn {
+    min-height: 40px;
+    border: 1px solid #d3d7dc;
+    border-radius: 8px;
+    background: #fff;
+    color: #333;
+    padding: 8px 12px;
+    font: inherit;
+}
+
+.clear-filters-btn {
+    cursor: pointer;
+    color: #d65d17;
+    border-color: #f2b38f;
+}
+
+.clear-filters-btn:hover {
+    background: #fff6f0;
+}
+
+.results-summary {
+    min-height: 22px;
+    margin: -8px 0 14px;
+    color: #666;
+    font-size: 14px;
+}
+
+@media (max-width: 600px) {
+    .items-section { padding: 18px 16px; }
+    .rental-filters { width: 100%; flex-wrap: wrap; margin-bottom: 12px; }
+    .rental-filters label { width: 100%; }
+    .rental-filters select { flex: 1; }
+    .category-filters { flex-wrap: wrap; }
 }
 
 .section-title {
