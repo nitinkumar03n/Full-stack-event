@@ -8,6 +8,7 @@ const crypto = require('crypto'); // Bas ye ek baar rahega
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Razorpay = require('razorpay');
+const cloudinary = require('cloudinary').v2;
 require('dotenv').config();
 
 
@@ -21,6 +22,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 5000;
+const cloudinaryConfigured = Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+);
+if (cloudinaryConfigured) {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+        secure: true
+    });
+}
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     console.error('❌ JWT_SECRET .env mein set nahi hai');
@@ -100,18 +114,28 @@ const paymentSchema = new mongoose.Schema({
 const Payment = mongoose.model('Payment', paymentSchema);
 const isValidPhone = (p) => /^[6-9]\d{9}$/.test(p);
 
-// Multer Storage Configuration
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        cb(null, 'vehicle-' + uniqueSuffix + path.extname(file.originalname));
+// Keep serving any older local uploads; new listing images are stored in Cloudinary.
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        cb(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype));
     }
 });
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }
-});
+
+function uploadVehicleImage(file) {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder: 'rent-connect/vehicles', resource_type: 'image' },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve(result.secure_url);
+            }
+        );
+        stream.end(file.buffer);
+    });
+}
 
 // Authentication Middleware
 const authMiddleware = (req, res, next) => {
@@ -301,9 +325,14 @@ app.post('/api/vehicles', authMiddleware, upload.single('vehicleImage'), async (
             title = `${brand || ''} ${model || ''}`.trim() || `${category.toUpperCase()} Rental`;
         }
 
-        const imgUrl = req.file
-            ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`
-            : 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500';
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'JPG, PNG, ya WebP vehicle photo upload karo (max 5 MB).' });
+        }
+        if (!cloudinaryConfigured) {
+            return res.status(503).json({ success: false, message: 'Vehicle photo storage configure nahi hai. Cloudinary environment variables set karo.' });
+        }
+
+        const imgUrl = await uploadVehicleImage(req.file);
 
         const newVehicle = new Vehicle({
             category,
