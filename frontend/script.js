@@ -747,6 +747,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     bookingEndDate.addEventListener('change', updateBookingEstimate);
 
+    const ownerAvailabilityStart = document.getElementById('ownerAvailabilityStart');
+    const ownerAvailabilityEnd = document.getElementById('ownerAvailabilityEnd');
+    ownerAvailabilityStart.addEventListener('change', () => {
+        ownerAvailabilityEnd.min = ownerAvailabilityStart.value || ownerAvailabilityEnd.min;
+        if (ownerAvailabilityEnd.value && ownerAvailabilityEnd.value < ownerAvailabilityStart.value) ownerAvailabilityEnd.value = '';
+    });
+
     document.getElementById('ownerAvailabilityForm').addEventListener('submit', async event => {
         event.preventDefault();
         if (!selectedCard || !token()) return;

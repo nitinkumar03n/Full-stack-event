@@ -813,3 +813,5 @@ button.calendar-day { cursor: pointer; }
 .booking-review-form textarea { min-height: 64px; resize: vertical; }
 .review-submitted { color: #18743b !important; font-weight: 600; }
 @media (max-width: 520px) { .availability-calendar { grid-template-columns: 1fr; } }
+
+#detailsModal .modal-card { max-height: 90vh; overflow-y: auto; }
