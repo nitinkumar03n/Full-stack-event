@@ -170,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('rc_token') && savedUser?.name && userBtn) {
         userBtn.innerText = `👤 ${savedUser.name.split(' ')[0]}`;
     }
+    document.getElementById('myBookingsBtn')?.classList.toggle('hidden', !localStorage.getItem('rc_token'));
 
     if (userBtn && authModal) {
      userBtn.addEventListener('click', () => {
@@ -180,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('rc_token');
             localStorage.removeItem('rc_user');
             userBtn.innerText = 'Login';
+            document.getElementById('myBookingsBtn')?.classList.add('hidden');
             loadVehicles().catch(console.error);
             alert('Aap logout ho gaye hain.');
         }
@@ -219,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (userBtn && data.user?.name) {
             userBtn.innerText = `👤 ${data.user.name.split(' ')[0]}`;
         }
+        document.getElementById('myBookingsBtn')?.classList.remove('hidden');
         document.getElementById('authModal').classList.remove('active');
         loadVehicles().catch(console.error);
     }
@@ -430,8 +433,7 @@ async function loadVehicles() {
 
 async function checkOwnerAvailability() {
     const token = localStorage.getItem('rc_token');
-    const user = JSON.parse(localStorage.getItem('rc_user') || 'null');
-    if (!token || user?.role !== 'owner') return;
+    if (!token) return;
     const response = await fetch(`${API_BASE}/api/owner/availability-checks`, {
         headers: { Authorization: `Bearer ${token}` }
     });
@@ -458,7 +460,10 @@ document.addEventListener('DOMContentLoaded', () => {
     rentVehicleForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         const token = localStorage.getItem('rc_token');
-        if (!token) return alert('Vehicle list karne ke liye pehle owner account se login karo.');
+        if (!token) {
+            document.getElementById('authModal').classList.add('active');
+            return alert('Vehicle list karne ke liye pehle login ya register karo.');
+        }
 
         const formData = new FormData();
         formData.append('category', vehicleCategory.value);
@@ -580,6 +585,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('detailsImg').src = selectedCard.dataset.img;
         document.getElementById('detailsTitle').textContent = selectedCard.dataset.title;
         document.getElementById('detailsPrice').textContent = selectedCard.dataset.price;
+        const bookingForm = document.getElementById('bookingRequestForm');
+        bookingForm.classList.toggle('hidden', selectedCard.dataset.isOwner === 'true');
+        bookingForm.reset();
+        document.getElementById('bookingEstimate').textContent = 'Choose dates to see the estimated rental.';
+        const today = new Date();
+        const todayValue = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        document.getElementById('bookingStartDate').min = todayValue;
+        document.getElementById('bookingEndDate').min = todayValue;
         document.getElementById('detailsOwnerName').textContent = selectedCard.dataset.ownerName || 'Vehicle owner';
         document.getElementById('detailsMileage').textContent = selectedCard.dataset.mileage || 'Not provided';
         document.getElementById('detailsService').textContent = selectedCard.dataset.service || 'Not provided';
@@ -590,6 +603,130 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('detailsUnlocked').classList.toggle('hidden', !unlocked);
         document.getElementById('unlockBtn').textContent = `Pay ₹${fees[category]} to Unlock Contact`;
         modal.classList.add('active');
+    });
+
+    const bookingStartDate = document.getElementById('bookingStartDate');
+    const bookingEndDate = document.getElementById('bookingEndDate');
+    function updateBookingEstimate() {
+        if (!selectedCard || !bookingStartDate.value || !bookingEndDate.value) {
+            document.getElementById('bookingEstimate').textContent = 'Choose dates to see the estimated rental.';
+            return;
+        }
+        const start = new Date(`${bookingStartDate.value}T00:00:00Z`);
+        const end = new Date(`${bookingEndDate.value}T00:00:00Z`);
+        const days = Math.floor((end - start) / 86400000) + 1;
+        if (days < 1) {
+            document.getElementById('bookingEstimate').textContent = 'End date start date ke barabar ya uske baad honi chahiye.';
+            return;
+        }
+        const estimate = Math.ceil((Number(selectedCard.dataset.priceAmount) * days) / 30);
+        document.getElementById('bookingEstimate').textContent = `${days} day${days === 1 ? '' : 's'} · estimated total ₹${estimate} (monthly rate ke hisaab se)`;
+    }
+    bookingStartDate.addEventListener('change', () => {
+        bookingEndDate.min = bookingStartDate.value || bookingStartDate.min;
+        if (bookingEndDate.value && bookingEndDate.value < bookingStartDate.value) bookingEndDate.value = '';
+        updateBookingEstimate();
+    });
+    bookingEndDate.addEventListener('change', updateBookingEstimate);
+
+    document.getElementById('bookingRequestForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!selectedCard) return;
+        if (!token()) {
+            modal.classList.remove('active');
+            document.getElementById('authModal').classList.add('active');
+            return alert('Booking request bhejne ke liye pehle login karo.');
+        }
+        const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        try {
+            const response = await fetch(`${API_BASE}/api/bookings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                body: JSON.stringify({ vehicleId: selectedCard.dataset.id, startDate: bookingStartDate.value, endDate: bookingEndDate.value })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) return alert(result.message || 'Booking request nahi bheji ja saki.');
+            alert(result.message);
+            event.currentTarget.reset();
+            updateBookingEstimate();
+            modal.classList.remove('active');
+        } catch (error) {
+            console.error('Booking request error:', error);
+            alert('Booking request nahi bheji ja saki. Backend connection check karo.');
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+
+    const bookingsModal = document.getElementById('bookingsModal');
+    const bookingsContent = document.getElementById('bookingsContent');
+    function escapeHtml(value = '') {
+        return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+    function bookingCard(booking, side) {
+        const vehicle = booking.vehicle || {};
+        const counterpart = side === 'owner' ? booking.renter : booking.owner;
+        const counterpartHtml = side === 'owner'
+            ? `<p>Requested by: ${escapeHtml(counterpart?.name || 'Renter')} · ${escapeHtml(counterpart?.email || '')} · ${escapeHtml(counterpart?.phone || '')}</p>`
+            : `<p>Owner: ${escapeHtml(counterpart?.name || 'Vehicle owner')}</p>`;
+        const actions = booking.status === 'pending' && side === 'owner'
+            ? `<button class="booking-action" data-action="accept">Accept</button><button class="booking-action secondary" data-action="decline">Decline</button>`
+            : ['pending', 'confirmed'].includes(booking.status)
+                ? `<button class="booking-action secondary" data-action="cancel">Cancel</button>` : '';
+        return `<article class="booking-card" data-booking-id="${escapeHtml(booking.id)}">
+            <div class="booking-card-heading"><strong>${escapeHtml(vehicle.title || 'Vehicle')}</strong><span class="booking-status ${escapeHtml(booking.status)}">${escapeHtml(booking.status)}</span></div>
+            <p>${escapeHtml(vehicle.category || '')}${vehicle.city ? ` · ${escapeHtml(vehicle.city)}` : ''}</p>
+            <p>${escapeHtml(booking.startDate)} to ${escapeHtml(booking.endDate)} · ₹${Number(booking.totalPrice).toLocaleString('en-IN')}</p>
+            ${counterpartHtml}<div class="booking-actions">${actions}</div>
+        </article>`;
+    }
+    async function renderBookings() {
+        const currentToken = token();
+        if (!currentToken) return;
+        bookingsContent.textContent = 'Loading bookings...';
+        try {
+            const response = await fetch(`${API_BASE}/api/bookings`, { headers: { Authorization: `Bearer ${currentToken}` } });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.message || 'Bookings load nahi hue.');
+            const renterItems = result.asRenter || [];
+            const ownerItems = result.forMyVehicles || [];
+            bookingsContent.innerHTML = `<section><h3>Requests for my listings</h3>${ownerItems.length ? ownerItems.map(item => bookingCard(item, 'owner')).join('') : '<p class="empty-bookings">Abhi aapki listings par koi booking request nahi hai.</p>'}</section>
+                <section><h3>My rental requests</h3>${renterItems.length ? renterItems.map(item => bookingCard(item, 'renter')).join('') : '<p class="empty-bookings">Aapne abhi koi booking request nahi bheji.</p>'}</section>`;
+        } catch (error) {
+            console.error('Bookings load error:', error);
+            bookingsContent.textContent = error.message || 'Bookings load nahi hue.';
+        }
+    }
+    document.getElementById('myBookingsBtn').addEventListener('click', async () => {
+        if (!token()) {
+            document.getElementById('authModal').classList.add('active');
+            return;
+        }
+        bookingsModal.classList.add('active');
+        await renderBookings();
+    });
+    document.getElementById('closeBookingsModal').addEventListener('click', () => bookingsModal.classList.remove('active'));
+    bookingsContent.addEventListener('click', async event => {
+        const actionButton = event.target.closest('[data-action]');
+        if (!actionButton) return;
+        const card = actionButton.closest('[data-booking-id]');
+        actionButton.disabled = true;
+        try {
+            const response = await fetch(`${API_BASE}/api/bookings/${card.dataset.bookingId}/respond`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                body: JSON.stringify({ action: actionButton.dataset.action })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) return alert(result.message || 'Booking update nahi hui.');
+            await renderBookings();
+        } catch (error) {
+            console.error('Booking update error:', error);
+            alert('Booking update nahi hui. Backend connection check karo.');
+        } finally {
+            actionButton.disabled = false;
+        }
     });
 
     document.getElementById('closeDetailsModal').addEventListener('click', () => modal.classList.remove('active'));

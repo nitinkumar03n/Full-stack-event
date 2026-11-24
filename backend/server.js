@@ -112,6 +112,18 @@ const paymentSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 const Payment = mongoose.model('Payment', paymentSchema);
+
+const bookingSchema = new mongoose.Schema({
+    vehicle: { type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle', required: true, index: true },
+    renter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true },
+    totalPrice: { type: Number, required: true },
+    status: { type: String, enum: ['pending', 'confirmed', 'declined', 'cancelled'], default: 'pending', index: true },
+    createdAt: { type: Date, default: Date.now }
+});
+const Booking = mongoose.model('Booking', bookingSchema);
 const isValidPhone = (p) => /^[6-9]\d{9}$/.test(p);
 
 // Keep serving any older local uploads; new listing images are stored in Cloudinary.
@@ -283,7 +295,8 @@ app.get('/api/vehicles', optionalAuthMiddleware, async (req, res) => {
                 ownerName: v.owner?.name || 'Vehicle owner',
                 ownerLocation: v.ownerLocation,
                 ownerPhone: (isUnlocked || isOwner) ? v.ownerPhone : null,
-                isUnlocked: isUnlocked || isOwner
+                isUnlocked: isUnlocked || isOwner,
+                isOwner
             };
         }));
 
@@ -298,8 +311,8 @@ app.get('/api/vehicles', optionalAuthMiddleware, async (req, res) => {
 app.post('/api/vehicles', authMiddleware, upload.single('vehicleImage'), async (req, res) => {
     try {
         const listingUser = await User.findById(req.userId);
-        if (!listingUser || listingUser.role !== 'owner') {
-            return res.status(403).json({ success: false, message: 'Owner account se login karke hi vehicle list kar sakte hain.' });
+        if (!listingUser) {
+            return res.status(401).json({ success: false, message: 'Account nahi mila. Dobara login karo.' });
         }
         const {
             category,
@@ -358,6 +371,174 @@ app.post('/api/vehicles', authMiddleware, upload.single('vehicleImage'), async (
     } catch (err) {
         console.error('Post Vehicle Error:', err);
         res.status(500).json({ success: false, message: 'Failed to post vehicle.' });
+    }
+});
+
+// Booking requests are date-based. Monthly rates are prorated over 30 days.
+function parseBookingDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) return null;
+    return date;
+}
+
+function serializeBooking(booking, side) {
+    const vehicle = booking.vehicle && typeof booking.vehicle === 'object' ? booking.vehicle : null;
+    const owner = booking.owner && typeof booking.owner === 'object' ? booking.owner : null;
+    const renter = booking.renter && typeof booking.renter === 'object' ? booking.renter : null;
+    return {
+        id: booking._id,
+        status: booking.status,
+        startDate: booking.startDate.toISOString().slice(0, 10),
+        endDate: booking.endDate.toISOString().slice(0, 10),
+        totalPrice: booking.totalPrice,
+        createdAt: booking.createdAt,
+        vehicle: vehicle ? {
+            id: vehicle._id,
+            title: vehicle.title,
+            category: vehicle.category,
+            price: vehicle.price,
+            city: vehicle.ownerLocation,
+            image: vehicle.img
+        } : null,
+        owner: side === 'renter' && owner ? { name: owner.name } : undefined,
+        renter: side === 'owner' && renter ? { name: renter.name, email: renter.email, phone: renter.phone } : undefined
+    };
+}
+
+app.post('/api/bookings', authMiddleware, async (req, res) => {
+    try {
+        const { vehicleId, startDate: startDateValue, endDate: endDateValue } = req.body;
+        if (!mongoose.isValidObjectId(vehicleId)) {
+            return res.status(400).json({ success: false, message: 'Vehicle select karo.' });
+        }
+
+        const startDate = parseBookingDate(startDateValue);
+        const endDate = parseBookingDate(endDateValue);
+        const todayValue = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+        }).format(new Date());
+        const today = parseBookingDate(todayValue);
+        if (!startDate || !endDate || startDate < today || endDate < startDate) {
+            return res.status(400).json({ success: false, message: 'Aaj ya uske baad ki valid start aur end dates chuno.' });
+        }
+
+        const vehicle = await Vehicle.findById(vehicleId);
+        if (!vehicle || vehicle.isAvailable === false || !vehicle.owner) {
+            return res.status(404).json({ success: false, message: 'Ye vehicle ab booking ke liye available nahi hai.' });
+        }
+        if (vehicle.owner.toString() === req.userId.toString()) {
+            return res.status(400).json({ success: false, message: 'Apni listing par booking request nahi bhej sakte.' });
+        }
+
+        const overlap = await Booking.exists({
+            vehicle: vehicle._id,
+            status: { $in: ['pending', 'confirmed'] },
+            startDate: { $lte: endDate },
+            endDate: { $gte: startDate }
+        });
+        if (overlap) {
+            return res.status(409).json({ success: false, message: 'In dates ke liye pehle se request/booking maujood hai. Doosri dates chuno.' });
+        }
+
+        const renter = await User.findById(req.userId).select('_id');
+        if (!renter) return res.status(401).json({ success: false, message: 'Dobara login karo.' });
+        const days = Math.floor((endDate - startDate) / 86400000) + 1;
+        const totalPrice = Math.ceil((vehicle.price * days) / 30);
+        const booking = await Booking.create({
+            vehicle: vehicle._id,
+            renter: renter._id,
+            owner: vehicle.owner,
+            startDate,
+            endDate,
+            totalPrice,
+            status: 'pending'
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Booking request owner ko bhej di gayi.',
+            booking: serializeBooking({ ...booking.toObject(), vehicle }, 'renter')
+        });
+    } catch (err) {
+        console.error('Create booking request error:', err);
+        res.status(500).json({ success: false, message: 'Booking request bheji nahi ja saki.' });
+    }
+});
+
+app.get('/api/bookings', authMiddleware, async (req, res) => {
+    try {
+        const [asRenter, forMyVehicles] = await Promise.all([
+            Booking.find({ renter: req.userId }).sort({ createdAt: -1 })
+                .populate('vehicle', 'title category price ownerLocation img')
+                .populate('owner', 'name')
+                .lean(),
+            Booking.find({ owner: req.userId }).sort({ createdAt: -1 })
+                .populate('vehicle', 'title category price ownerLocation img')
+                .populate('renter', 'name email phone')
+                .lean()
+        ]);
+        res.json({
+            success: true,
+            asRenter: asRenter.map(booking => serializeBooking(booking, 'renter')),
+            forMyVehicles: forMyVehicles.map(booking => serializeBooking(booking, 'owner'))
+        });
+    } catch (err) {
+        console.error('Load bookings error:', err);
+        res.status(500).json({ success: false, message: 'Bookings load nahi ho sake.' });
+    }
+});
+
+app.post('/api/bookings/:bookingId/respond', authMiddleware, async (req, res) => {
+    try {
+        const { action } = req.body;
+        if (!['accept', 'decline', 'cancel'].includes(action) || !mongoose.isValidObjectId(req.params.bookingId)) {
+            return res.status(400).json({ success: false, message: 'Invalid booking action.' });
+        }
+        const booking = await Booking.findById(req.params.bookingId);
+        if (!booking) return res.status(404).json({ success: false, message: 'Booking request nahi mili.' });
+
+        const isOwner = booking.owner.toString() === req.userId.toString();
+        const isRenter = booking.renter.toString() === req.userId.toString();
+        if (action === 'cancel') {
+            if (!isOwner && !isRenter) return res.status(403).json({ success: false, message: 'Is booking ko manage karne ki permission nahi hai.' });
+            if (!['pending', 'confirmed'].includes(booking.status)) {
+                return res.status(409).json({ success: false, message: 'Ye booking ab cancel nahi ho sakti.' });
+            }
+            booking.status = 'cancelled';
+        } else {
+            if (!isOwner) return res.status(403).json({ success: false, message: 'Sirf listing owner request ka jawab de sakta hai.' });
+            if (booking.status !== 'pending') return res.status(409).json({ success: false, message: 'Is request ka pehle hi jawab diya ja chuka hai.' });
+
+            if (action === 'accept') {
+                const conflict = await Booking.exists({
+                    _id: { $ne: booking._id },
+                    vehicle: booking.vehicle,
+                    status: 'confirmed',
+                    startDate: { $lte: booking.endDate },
+                    endDate: { $gte: booking.startDate }
+                });
+                if (conflict) return res.status(409).json({ success: false, message: 'In dates par doosri confirmed booking hai.' });
+                booking.status = 'confirmed';
+            } else {
+                booking.status = 'declined';
+            }
+        }
+
+        await booking.save();
+        if (action === 'accept') {
+            await Booking.updateMany({
+                _id: { $ne: booking._id },
+                vehicle: booking.vehicle,
+                status: 'pending',
+                startDate: { $lte: booking.endDate },
+                endDate: { $gte: booking.startDate }
+            }, { $set: { status: 'declined' } });
+        }
+        res.json({ success: true, message: action === 'accept' ? 'Booking confirm ho gayi.' : action === 'decline' ? 'Request decline kar di.' : 'Booking cancel kar di.' });
+    } catch (err) {
+        console.error('Respond to booking error:', err);
+        res.status(500).json({ success: false, message: 'Booking update nahi ho saki.' });
     }
 });
 

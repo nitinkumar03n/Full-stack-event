@@ -110,7 +110,9 @@
 <section class="items-section">
     <div class="items-heading-row">
         <h2 class="section-title">Available Rentals</h2>
-        <div class="rental-filters">
+        <div class="rental-heading-actions">
+            <button type="button" id="myBookingsBtn" class="clear-filters-btn hidden">My bookings & requests</button>
+            <div class="rental-filters">
             <label for="budgetFilter">Monthly budget</label>
             <select id="budgetFilter">
                 <option value="">Any budget</option>
@@ -122,6 +124,7 @@
                 <option value="50000">Up to ₹50,000</option>
             </select>
             <button type="button" id="clearFiltersBtn" class="clear-filters-btn">Clear filters</button>
+            </div>
         </div>
     </div>
     <p id="resultsSummary" class="results-summary" aria-live="polite">Loading available vehicles...</p>
@@ -315,6 +318,26 @@
             <p><strong>Owner Phone:</strong> <span id="detailsPhone"></span></p>
             <p><strong>Location:</strong> <span id="detailsLocation"></span></p>
         </div>
+
+        <form id="bookingRequestForm" class="booking-form hidden">
+            <h3>Request these dates</h3>
+            <div class="booking-date-fields">
+                <label>Start date<input id="bookingStartDate" type="date" required></label>
+                <label>End date<input id="bookingEndDate" type="date" required></label>
+            </div>
+            <p id="bookingEstimate" class="booking-estimate">Choose dates to see the estimated rental.</p>
+            <button type="submit" class="submit-btn">Send booking request</button>
+            <p class="booking-note">Payment is not collected here. The owner must confirm your request.</p>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="bookingsModal">
+    <div class="modal-card bookings-modal-card">
+        <button class="close-btn" id="closeBookingsModal">&times;</button>
+        <h2>My bookings & requests</h2>
+        <p class="booking-note">Manage requests for your listings and check your rental status.</p>
+        <div id="bookingsContent" class="bookings-content">Loading bookings...</div>
     </div>
 </div>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
