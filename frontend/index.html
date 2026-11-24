@@ -302,7 +302,8 @@
         <h2 id="detailsTitle"></h2>
         <p id="detailsPrice" class="price"></p>
         <div class="public-vehicle-details">
-            <p><strong>Owner:</strong> <span id="detailsOwnerName"></span></p>
+            <p><strong>Owner:</strong> <span id="detailsOwnerName"></span> <span id="detailsVerifiedBadge" class="verification-badge hidden">✓ Verified owner</span></p>
+            <p id="detailsRating" class="details-rating">No reviews yet</p>
             <p><strong>Mileage:</strong> <span id="detailsMileage"></span></p>
             <p><strong>Service history:</strong> <span id="detailsService"></span></p>
         </div>
@@ -319,6 +320,26 @@
             <p><strong>Location:</strong> <span id="detailsLocation"></span></p>
         </div>
 
+        <section class="availability-section">
+            <h3>Availability calendar</h3>
+            <p class="booking-note"><span class="calendar-key available-key">Available</span><span class="calendar-key unavailable-key">Unavailable</span></p>
+            <div id="availabilityCalendar" class="availability-calendar" aria-live="polite">Loading dates...</div>
+        </section>
+        <form id="ownerAvailabilityForm" class="booking-form hidden">
+            <h3>Manage your available dates</h3>
+            <div class="booking-date-fields">
+                <label>Start date<input id="ownerAvailabilityStart" type="date" required></label>
+                <label>End date<input id="ownerAvailabilityEnd" type="date" required></label>
+            </div>
+            <div class="booking-actions">
+                <button type="submit" class="booking-action" data-calendar-action="block">Mark unavailable</button>
+                <button type="submit" class="booking-action secondary" data-calendar-action="open">Mark available</button>
+            </div>
+        </form>
+        <div class="vehicle-reviews-section">
+            <h3>Renter reviews</h3>
+            <div id="vehicleReviews">Loading reviews...</div>
+        </div>
         <form id="bookingRequestForm" class="booking-form hidden">
             <h3>Request these dates</h3>
             <div class="booking-date-fields">
@@ -337,6 +358,11 @@
         <button class="close-btn" id="closeBookingsModal">&times;</button>
         <h2>My bookings & requests</h2>
         <p class="booking-note">Manage requests for your listings and check your rental status.</p>
+        <div class="verification-panel">
+            <p>Owner verification: <strong id="verificationStatus">Not verified</strong></p>
+            <button type="button" id="requestVerificationBtn" class="booking-action secondary">Request verified badge</button>
+            <small>Badge approval is reviewed manually.</small>
+        </div>
         <div id="bookingsContent" class="bookings-content">Loading bookings...</div>
     </div>
 </div>

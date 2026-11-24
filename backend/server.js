@@ -75,6 +75,7 @@ const userSchema = new mongoose.Schema({
     phone: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     role: { type: String, enum: ['customer', 'owner'], default: 'customer' },
+    verificationStatus: { type: String, enum: ['unverified', 'pending', 'verified', 'rejected'], default: 'unverified' },
     unlockedVehicles: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle' }],
     createdAt: { type: Date, default: Date.now },
 
@@ -96,6 +97,7 @@ const vehicleSchema = new mongoose.Schema({
     isAvailable: { type: Boolean, default: true },
     availabilityCheckDueAt: { type: Date, default: null },
     rentConfirmedAt: { type: Date, default: null },
+    unavailablePeriods: [{ startDate: { type: Date, required: true }, endDate: { type: Date, required: true } }],
     createdAt: { type: Date, default: Date.now }
 });
 const Vehicle = mongoose.model('Vehicle', vehicleSchema);
@@ -121,9 +123,21 @@ const bookingSchema = new mongoose.Schema({
     endDate: { type: Date, required: true },
     totalPrice: { type: Number, required: true },
     status: { type: String, enum: ['pending', 'confirmed', 'declined', 'cancelled'], default: 'pending', index: true },
+    reviewSubmitted: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
 const Booking = mongoose.model('Booking', bookingSchema);
+
+const reviewSchema = new mongoose.Schema({
+    vehicle: { type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle', required: true, index: true },
+    booking: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: true, unique: true },
+    renter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    rating: { type: Number, min: 1, max: 5, required: true },
+    comment: { type: String, trim: true, maxlength: 1000, default: '' },
+    createdAt: { type: Date, default: Date.now }
+});
+const Review = mongoose.model('Review', reviewSchema);
 const isValidPhone = (p) => /^[6-9]\d{9}$/.test(p);
 
 // Keep serving any older local uploads; new listing images are stored in Cloudinary.
@@ -281,6 +295,10 @@ app.get('/api/vehicles', optionalAuthMiddleware, async (req, res) => {
 
         const vehicles = await Vehicle.find({ isAvailable: { $ne: false }, owner: { $ne: null } }).populate('owner', 'name').sort({ createdAt: -1 }).lean();
 
+        const reviewSummaries = await Review.aggregate([
+            { $group: { _id: '$vehicle', averageRating: { $avg: '$rating' }, reviewCount: { $sum: 1 } } }
+        ]);
+        const reviewsByVehicle = new Map(reviewSummaries.map(item => [item._id.toString(), item]));
         const sanitizedVehicles = await Promise.all(vehicles.map(async v => {
             const isUnlocked = userUnlockedList.includes(v._id.toString());
             const isOwner = Boolean(req.userId && v.owner && v.owner._id.toString() === req.userId.toString());
@@ -296,7 +314,10 @@ app.get('/api/vehicles', optionalAuthMiddleware, async (req, res) => {
                 ownerLocation: v.ownerLocation,
                 ownerPhone: (isUnlocked || isOwner) ? v.ownerPhone : null,
                 isUnlocked: isUnlocked || isOwner,
-                isOwner
+                isOwner,
+                ownerVerified: v.owner?.verificationStatus === 'verified',
+                averageRating: reviewsByVehicle.get(v._id.toString())?.averageRating || 0,
+                reviewCount: reviewsByVehicle.get(v._id.toString())?.reviewCount || 0
             };
         }));
 
@@ -406,6 +427,177 @@ function serializeBooking(booking, side) {
     };
 }
 
+function periodsOverlap(startDate, endDate, period) {
+    return period.startDate <= endDate && period.endDate >= startDate;
+}
+
+app.get('/api/vehicles/:vehicleId/availability', async (req, res) => {
+    try {
+        if (!mongoose.isValidObjectId(req.params.vehicleId)) return res.status(400).json({ success: false, message: 'Vehicle ID invalid hai.' });
+        const from = parseBookingDate(req.query.from);
+        const to = parseBookingDate(req.query.to);
+        if (!from || !to || to < from || (to - from) / 86400000 > 100) {
+            return res.status(400).json({ success: false, message: 'Valid date range chuno (maximum 100 days).' });
+        }
+        const vehicle = await Vehicle.findById(req.params.vehicleId).select('unavailablePeriods isAvailable');
+        if (!vehicle) return res.status(404).json({ success: false, message: 'Vehicle nahi mila.' });
+        const bookings = await Booking.find({
+            vehicle: vehicle._id,
+            status: { $in: ['pending', 'confirmed'] },
+            startDate: { $lte: to }, endDate: { $gte: from }
+        }).select('startDate endDate status').lean();
+        const blocked = (vehicle.unavailablePeriods || []).filter(period => periodsOverlap(from, to, period));
+        res.json({
+            success: true,
+            unavailable: [
+                ...blocked.map(period => ({ startDate: period.startDate.toISOString().slice(0, 10), endDate: period.endDate.toISOString().slice(0, 10), reason: 'owner-blocked' })),
+                ...bookings.map(booking => ({ startDate: booking.startDate.toISOString().slice(0, 10), endDate: booking.endDate.toISOString().slice(0, 10), reason: booking.status }))
+            ],
+            isAvailable: vehicle.isAvailable !== false
+        });
+    } catch (err) {
+        console.error('Availability calendar error:', err);
+        res.status(500).json({ success: false, message: 'Availability calendar load nahi ho saka.' });
+    }
+});
+
+app.post('/api/vehicles/:vehicleId/availability', authMiddleware, async (req, res) => {
+    try {
+        if (!mongoose.isValidObjectId(req.params.vehicleId)) return res.status(400).json({ success: false, message: 'Vehicle ID invalid hai.' });
+        const startDate = parseBookingDate(req.body.startDate);
+        const endDate = parseBookingDate(req.body.endDate);
+        const action = req.body.action;
+        if (!startDate || !endDate || endDate < startDate || !['block', 'open'].includes(action)) {
+            return res.status(400).json({ success: false, message: 'Valid dates aur block/open action chuno.' });
+        }
+        const vehicle = await Vehicle.findOne({ _id: req.params.vehicleId, owner: req.userId });
+        if (!vehicle) return res.status(404).json({ success: false, message: 'Sirf apni listing ka calendar manage kar sakte hain.' });
+        if (action === 'block') {
+            const conflict = await Booking.exists({
+                vehicle: vehicle._id, status: { $in: ['pending', 'confirmed'] },
+                startDate: { $lte: endDate }, endDate: { $gte: startDate }
+            });
+            if (conflict) return res.status(409).json({ success: false, message: 'In dates par booking request/confirmation hai; pehle usse manage karo.' });
+            vehicle.unavailablePeriods.push({ startDate, endDate });
+        } else {
+            const updated = [];
+            for (const period of vehicle.unavailablePeriods || []) {
+                if (!periodsOverlap(startDate, endDate, period)) { updated.push(period); continue; }
+                if (period.startDate < startDate) {
+                    updated.push({ startDate: period.startDate, endDate: new Date(startDate.getTime() - 86400000) });
+                }
+                if (period.endDate > endDate) {
+                    updated.push({ startDate: new Date(endDate.getTime() + 86400000), endDate: period.endDate });
+                }
+            }
+            vehicle.unavailablePeriods = updated;
+        }
+        await vehicle.save();
+        res.json({ success: true, message: action === 'block' ? 'Dates unavailable mark ho gayi.' : 'Dates ab available hain.' });
+    } catch (err) {
+        console.error('Update availability error:', err);
+        res.status(500).json({ success: false, message: 'Availability update nahi ho saka.' });
+    }
+});
+
+app.get('/api/verification/status', authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId).select('verificationStatus');
+        if (!user) return res.status(404).json({ success: false, message: 'Account nahi mila.' });
+        res.json({ success: true, status: user.verificationStatus || 'unverified' });
+    } catch (err) {
+        console.error('Verification status error:', err);
+        res.status(500).json({ success: false, message: 'Verification status load nahi hua.' });
+    }
+});
+
+app.post('/api/verification/request', authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'Account nahi mila.' });
+        if (!(await Vehicle.exists({ owner: user._id }))) return res.status(400).json({ success: false, message: 'Verified badge request se pehle kam se kam ek vehicle list karo.' });
+        if (user.verificationStatus === 'verified') return res.json({ success: true, status: 'verified', message: 'Aap pehle se verified hain.' });
+        user.verificationStatus = 'pending';
+        await user.save();
+        res.json({ success: true, status: 'pending', message: 'Verification request bhej di. Badge review ke baad dikhega.' });
+    } catch (err) {
+        console.error('Verification request error:', err);
+        res.status(500).json({ success: false, message: 'Verification request bheji nahi ja saki.' });
+    }
+});
+
+app.get('/api/vehicles/:vehicleId/reviews', async (req, res) => {
+    try {
+        if (!mongoose.isValidObjectId(req.params.vehicleId)) return res.status(400).json({ success: false, message: 'Vehicle ID invalid hai.' });
+        const reviews = await Review.find({ vehicle: req.params.vehicleId }).sort({ createdAt: -1 })
+            .populate('renter', 'name').limit(20).lean();
+        res.json({ success: true, reviews: reviews.map(review => ({ rating: review.rating, comment: review.comment, renterName: review.renter?.name || 'Renter', createdAt: review.createdAt })) });
+    } catch (err) {
+        console.error('Vehicle reviews error:', err);
+        res.status(500).json({ success: false, message: 'Reviews load nahi ho sake.' });
+    }
+});
+
+app.post('/api/bookings/:bookingId/review', authMiddleware, async (req, res) => {
+    try {
+        if (!mongoose.isValidObjectId(req.params.bookingId)) return res.status(400).json({ success: false, message: 'Booking ID invalid hai.' });
+        const rating = Number(req.body.rating);
+        const comment = typeof req.body.comment === 'string' ? req.body.comment.trim() : '';
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5 || comment.length > 1000) {
+            return res.status(400).json({ success: false, message: '1 se 5 stars aur 1000 characters tak review likho.' });
+        }
+        const booking = await Booking.findOne({ _id: req.params.bookingId, renter: req.userId });
+        if (!booking) return res.status(404).json({ success: false, message: 'Aapki booking nahi mili.' });
+        const todayValue = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        const today = parseBookingDate(todayValue);
+        if (booking.status !== 'confirmed' || booking.endDate >= today) {
+            return res.status(409).json({ success: false, message: 'Review completed, confirmed rental ke baad hi de sakte hain.' });
+        }
+        if (booking.reviewSubmitted) return res.status(409).json({ success: false, message: 'Is booking par review pehle submit ho chuka hai.' });
+        await Review.create({ vehicle: booking.vehicle, booking: booking._id, renter: booking.renter, owner: booking.owner, rating, comment });
+        booking.reviewSubmitted = true;
+        await booking.save();
+        res.status(201).json({ success: true, message: 'Review submit ho gaya. Shukriya!' });
+    } catch (err) {
+        if (err.code === 11000) return res.status(409).json({ success: false, message: 'Is booking par review pehle submit ho chuka hai.' });
+        console.error('Submit review error:', err);
+        res.status(500).json({ success: false, message: 'Review submit nahi ho saka.' });
+    }
+});
+
+/* Owner verification approval is controlled by a server-side secret. Keep it in
+   Render environment variables; never include it in frontend code. */
+app.get('/api/admin/verification', authMiddleware, async (req, res) => {
+    try {
+        const adminKey = process.env.VERIFICATION_ADMIN_KEY;
+        if (!adminKey || req.get('x-verification-admin-key') !== adminKey) return res.status(403).json({ success: false, message: 'Verification admin access nahi hai.' });
+        const users = await User.find({ verificationStatus: 'pending' }).select('name email verificationStatus createdAt').lean();
+        res.json({ success: true, requests: users });
+    } catch (err) {
+        console.error('Verification request list error:', err);
+        res.status(500).json({ success: false, message: 'Verification requests load nahi ho sake.' });
+    }
+});
+
+app.post('/api/admin/verification/:userId', authMiddleware, async (req, res) => {
+    try {
+        const adminKey = process.env.VERIFICATION_ADMIN_KEY;
+        if (!adminKey || req.get('x-verification-admin-key') !== adminKey) {
+            return res.status(403).json({ success: false, message: 'Verification admin access nahi hai.' });
+        }
+        const status = req.body.status;
+        if (!['verified', 'rejected'].includes(status) || !mongoose.isValidObjectId(req.params.userId)) {
+            return res.status(400).json({ success: false, message: 'Valid user ID aur verified/rejected status required.' });
+        }
+        const user = await User.findByIdAndUpdate(req.params.userId, { verificationStatus: status }, { new: true }).select('name email verificationStatus');
+        if (!user) return res.status(404).json({ success: false, message: 'User nahi mila.' });
+        res.json({ success: true, user });
+    } catch (err) {
+        console.error('Verification admin update error:', err);
+        res.status(500).json({ success: false, message: 'Verification update nahi ho saka.' });
+    }
+});
+
 app.post('/api/bookings', authMiddleware, async (req, res) => {
     try {
         const { vehicleId, startDate: startDateValue, endDate: endDateValue } = req.body;
@@ -430,6 +622,9 @@ app.post('/api/bookings', authMiddleware, async (req, res) => {
         if (vehicle.owner.toString() === req.userId.toString()) {
             return res.status(400).json({ success: false, message: 'Apni listing par booking request nahi bhej sakte.' });
         }
+
+        const ownerBlocked = (vehicle.unavailablePeriods || []).some(period => periodsOverlap(startDate, endDate, period));
+        if (ownerBlocked) return res.status(409).json({ success: false, message: 'Owner ne in dates ko unavailable mark kiya hai.' });
 
         const overlap = await Booking.exists({
             vehicle: vehicle._id,
@@ -478,9 +673,11 @@ app.get('/api/bookings', authMiddleware, async (req, res) => {
                 .populate('renter', 'name email phone')
                 .lean()
         ]);
+        const reviewedBookings = await Review.find({ booking: { $in: asRenter.map(booking => booking._id) } }).select('booking').lean();
+        const reviewedIds = new Set(reviewedBookings.map(review => review.booking.toString()));
         res.json({
             success: true,
-            asRenter: asRenter.map(booking => serializeBooking(booking, 'renter')),
+            asRenter: asRenter.map(booking => ({ ...serializeBooking(booking, 'renter'), reviewSubmitted: reviewedIds.has(booking._id.toString()) })),
             forMyVehicles: forMyVehicles.map(booking => serializeBooking(booking, 'owner'))
         });
     } catch (err) {
@@ -511,6 +708,9 @@ app.post('/api/bookings/:bookingId/respond', authMiddleware, async (req, res) =>
             if (booking.status !== 'pending') return res.status(409).json({ success: false, message: 'Is request ka pehle hi jawab diya ja chuka hai.' });
 
             if (action === 'accept') {
+                const vehicle = await Vehicle.findById(booking.vehicle).select('unavailablePeriods');
+                const blocked = (vehicle?.unavailablePeriods || []).some(period => periodsOverlap(booking.startDate, booking.endDate, period));
+                if (blocked) return res.status(409).json({ success: false, message: 'Owner ne in dates ko unavailable mark kiya hai.' });
                 const conflict = await Booking.exists({
                     _id: { $ne: booking._id },
                     vehicle: booking.vehicle,
